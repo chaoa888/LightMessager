@@ -29,6 +29,6 @@ namespace LightMessager.Message
         //
         // 摘要:
         //     This method will be invoked with a message of type TMessage
-        Task Handle(TMessage message);
+        void Handle(TMessage message);
     }
 }

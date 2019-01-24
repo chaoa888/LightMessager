@@ -6,7 +6,7 @@ namespace LightMessager.DAL
     /// 实体
     /// </summary>
     [Serializable]
-	public class MessageQueue
+	internal class MessageQueue
 	{
 		public MessageQueue()
 		{}

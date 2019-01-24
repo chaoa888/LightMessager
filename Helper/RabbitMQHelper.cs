@@ -2,24 +2,32 @@
 using LightMessager.DAL;
 using LightMessager.Message;
 using LightMessager.Pool;
+using Microsoft.Extensions.Configuration;
 using NLog;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.IO;
 using System.Text;
 using System.Threading;
 
 namespace LightMessager.Helper
 {
+    /* 
+     * links: 
+     * https://www.rabbitmq.com/dotnet-api-guide.html
+     * https://www.rabbitmq.com/queues.html
+     * https://www.rabbitmq.com/confirms.html
+    */
     public sealed class RabbitMQHelper
     {
         static ConnectionFactory factory;
         static IConnection connection;
         static List<string> prepersist;
         static ConcurrentDictionary<Type, QueueInfo> dict_info;
-        static ConcurrentDictionary<Type, object> dict_fun;
+        static ConcurrentDictionary<Type, object> dict_func;
         static ConcurrentDictionary<Type, ObjectPool<IPooledWapper>> pools;
         static readonly ushort prefetch_count;
         static object lockobj = new object();
@@ -30,17 +38,30 @@ namespace LightMessager.Helper
 
         static RabbitMQHelper()
         {
+            #region 读取配置
+            // 添加json配置文件路径
+#if LOCAL
+            var builder = new ConfigurationBuilder().SetBasePath(Directory.GetCurrentDirectory()).AddJsonFile("appsettings.Local.json");
+#elif DEBUG
+            var builder = new ConfigurationBuilder().SetBasePath(Directory.GetCurrentDirectory()).AddJsonFile("appsettings.Development.json");
+#else
+            var builder = new ConfigurationBuilder().SetBasePath(Directory.GetCurrentDirectory()).AddJsonFile("appsettings.json");
+#endif
+            // 创建配置根对象
+            var configurationRoot = builder.Build();
+            #endregion
+
             prefetch_count = 5;
             prepersist = new List<string>();
             dict_info = new ConcurrentDictionary<Type, QueueInfo>();
-            dict_fun = new ConcurrentDictionary<Type, object>();
+            dict_func = new ConcurrentDictionary<Type, object>();
             pools = new ConcurrentDictionary<Type, ObjectPool<IPooledWapper>>();
             factory = new ConnectionFactory();
-            factory.UserName = "admin";
-            factory.Password = "123456";
-            factory.VirtualHost = "/";
-            factory.HostName = "127.0.0.1";
-            factory.Port = 5672;
+            factory.UserName = configurationRoot.GetSection("LightMessager:UserName").Value; // "admin";
+            factory.Password = configurationRoot.GetSection("LightMessager:Password").Value; // "123456";
+            factory.VirtualHost = configurationRoot.GetSection("LightMessager:VirtualHost").Value; // "/";
+            factory.HostName = configurationRoot.GetSection("LightMessager:HostName").Value; // "127.0.0.1";
+            factory.Port = int.Parse(configurationRoot.GetSection("LightMessager:Port").Value); // 5672;
             factory.AutomaticRecoveryEnabled = true;
             factory.NetworkRecoveryInterval = TimeSpan.FromSeconds(30);
             connection = factory.CreateConnection();
@@ -59,9 +80,9 @@ namespace LightMessager.Helper
             try
             {
                 var type = typeof(TMessage);
-                if (!dict_fun.ContainsKey(type))
+                if (!dict_func.ContainsKey(type))
                 {
-                    var obj = dict_fun.GetOrAdd(type, t => Activator.CreateInstance<THandler>()) as THandler;
+                    var obj = dict_func.GetOrAdd(type, t => Activator.CreateInstance<THandler>()) as THandler;
                     var channel = connection.CreateModel();
                     var consumer = new EventingBasicConsumer(channel);
                     if (delayProcess > 0)
@@ -73,7 +94,7 @@ namespace LightMessager.Helper
                         */
                         channel.BasicQos(0, prefetch_count, false);
                     }
-                    consumer.Received += async (model, ea) =>
+                    consumer.Received += (model, ea) =>
                     {
                         var body = Encoding.UTF8.GetString(ea.Body);
                         var json = Jil.JSON.Deserialize<TMessage>(body);
@@ -81,7 +102,7 @@ namespace LightMessager.Helper
                         {
                             Thread.Sleep(delayProcess);
                         }
-                        await obj.Handle(json);
+                        obj.Handle(json);
                         if (json.NeedNAck)
                         {
                             channel.BasicNack(ea.DeliveryTag, false, true);
@@ -101,7 +122,6 @@ namespace LightMessager.Helper
             }
             catch (Exception ex)
             {
-                //ErrorStore.LogExceptionWithoutContext(ex);
                 _logger.Debug("RegisterHandler(int delayProcess = 0)出错，异常：" + ex.Message + "；堆栈：" + ex.StackTrace);
             }
         }
@@ -125,9 +145,9 @@ namespace LightMessager.Helper
                 }
 
                 var type = typeof(TMessage);
-                if (!dict_fun.ContainsKey(type))
+                if (!dict_func.ContainsKey(type))
                 {
-                    var obj = dict_fun.GetOrAdd(type, t => Activator.CreateInstance<THandler>()) as THandler;
+                    var obj = dict_func.GetOrAdd(type, t => Activator.CreateInstance<THandler>()) as THandler;
                     var channel = connection.CreateModel();
                     var consumer = new EventingBasicConsumer(channel);
                     if (delayProcess > 0)
@@ -139,7 +159,7 @@ namespace LightMessager.Helper
                         */
                         channel.BasicQos(0, prefetch_count, false);
                     }
-                    consumer.Received += async (model, ea) =>
+                    consumer.Received += (model, ea) =>
                     {
                         var body = Encoding.UTF8.GetString(ea.Body);
                         var json = Jil.JSON.Deserialize<TMessage>(body);
@@ -147,7 +167,7 @@ namespace LightMessager.Helper
                         {
                             Thread.Sleep(delayProcess);
                         }
-                        await obj.Handle(json);
+                        obj.Handle(json);
                         if (json.NeedNAck)
                         {
                             channel.BasicNack(ea.DeliveryTag, false, true);
@@ -167,7 +187,6 @@ namespace LightMessager.Helper
             }
             catch (Exception ex)
             {
-                //ErrorStore.LogExceptionWithoutContext(ex);
                 _logger.Debug("RegisterHandler(string subscriberName, int delayProcess = 0)出错，异常：" + ex.Message + "；堆栈：" + ex.StackTrace);
             }
         }

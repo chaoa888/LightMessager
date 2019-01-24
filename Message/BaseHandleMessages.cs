@@ -1,9 +1,8 @@
 ﻿using LightMessager.Exceptions;
+using NLog;
 using System;
 using System.Collections.Concurrent;
 using System.Threading;
-using System.Threading.Tasks;
-using NLog;
 
 namespace LightMessager.Message
 {
@@ -14,12 +13,12 @@ namespace LightMessager.Message
         private static readonly int retry_wait = 1000 * 2; // 2秒
         private static readonly ConcurrentDictionary<string, int> retry_list = new ConcurrentDictionary<string, int>();
 
-        public async Task Handle(TMessage message)
+        public void Handle(TMessage message)
         {
             var sleep = 0;
             try
             {
-                await DoHandle(message);
+                DoHandle(message);
             }
             catch (Exception<LightMessagerExceptionArgs> ex)
             {
@@ -33,7 +32,6 @@ namespace LightMessager.Message
                         retry_list.TryUpdate(message.ID, new_value, retry_count);
                         if (new_value > 4) // 1, 2, 4 最大允许重试3次
                         {
-                            //ErrorStore.LogExceptionWithoutContext(ex);
                             _logger.Debug("重试超过最大次数(4)，异常：" + ex.Message + "；堆栈：" + ex.StackTrace);
                         }
                         else
@@ -49,13 +47,11 @@ namespace LightMessager.Message
                 }
                 else
                 {
-                    //ErrorStore.LogExceptionWithoutContext(ex);
                     _logger.Debug("CanBeSwallowed=true，异常：" + ex.Message + "；堆栈：" + ex.StackTrace);
                 }
             }
             catch (Exception ex)
             {
-                //ErrorStore.LogExceptionWithoutContext(ex); 
                 _logger.Debug("未知异常：" + ex.Message + "；堆栈：" + ex.StackTrace);
             }
 
@@ -67,7 +63,7 @@ namespace LightMessager.Message
             }
         }
 
-        protected virtual Task DoHandle(TMessage message)
+        protected virtual void DoHandle(TMessage message)
         {
             throw new NotImplementedException();
         }

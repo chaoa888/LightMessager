@@ -1,16 +1,14 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
+﻿using System.Collections.Generic;
 
 namespace LightMessager.DAL
 {
-    public class PageDataView<T>
+    internal class PageDataView<T>
     {
         private int _totalRecords;
+        private IList<T> _Items;
+
         public PageDataView()
         {
-            this._Items = new List<T>();
         }
 
         public int TotalRecords
@@ -18,8 +16,7 @@ namespace LightMessager.DAL
             get { return _totalRecords; }
             set { _totalRecords = value; }
         }
-
-        private IList<T> _Items;
+        
         public IList<T> Items
         {
             get { return _Items; }
