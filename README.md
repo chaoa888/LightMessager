@@ -53,6 +53,21 @@
 
 
 
+rabbitmq自带有automatic recovery特性，能在网络发生异常时进行自我恢复。这包括连接的恢复和网络拓扑（topology）（queues、exchanges、bingds and consumers）的恢复。
+
+rabbitmq对于connection的恢复有一定的限制：
+> When a connection is down or lost, it takes time to detect.
+首先，一个失效的连接需要一定的时间才能被发现，因此在这段时间中发送的消息就需要额外的手段来保证其不被丢失
+
+rabbitmq默认情况下每隔5秒重试一次恢复连接，重试的时候如果试图发送一条消息，那么将会触发一个exception。应用层可能需要处理该异常以保证发送的消息不会丢失掉
+
+> Acknowledgements with stale delivery tags will not be sent. Applications that use manual acknowledgements and automatic recovery must be capable of handling redeliveries.
+
+
+可靠的消息送达
+一种方式是At-least-once delivery，既可以也可以使用rabbitmq自带的publisher confirms机制，配合上一定的消息重发策略即可；对于消息重发来说，也有一些简单的思路可以参考：
+1. resend if your connection is lost or some other crash occurs before you receive confirmation of receipt
+2. 超时机制
 
 
 
