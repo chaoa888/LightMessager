@@ -39,7 +39,7 @@
 + 同时注意mandatory和persistent的区别，前者会在消息无法送达的情况下触发basic.return事件，后者则是会让消息持久化至磁盘
 
 
-##### 线程模型
+### 线程模型
 在线程模型上，主要考虑两个类型`Connection`和`Channle`
 
 在当前版本的c#客户端中，一个connection对应着一个线程，抽象的是一个tcp连接，而多个channel通过多路复用共用一个connection
@@ -50,7 +50,7 @@
 
 在channel层面更容易出现各种问题导致channel关闭（connection相对来说要稳定一些），因此考虑对channel池化进而达到复用的目的比较可取
 
-##### 自动恢复
+### 自动恢复
 
 rabbitmq自带有automatic recovery特性，能在网络发生异常时进行自我恢复。这包括连接的恢复和网络拓扑（topology）（queues、exchanges、bingds and consumers）的恢复（注意）。
 
@@ -73,7 +73,7 @@ rabbitmq对于connection的恢复有一定的缺陷：
     
     rabbitmq默认情况下每隔5秒重试一次恢复连接，重试的时候如果试图发送一条消息，这将会触发一个exception，应用层可能需要处理该异常以保证发送的消息不会丢失掉（也建议配合*publisher confirms*来做处理）
 
-##### 可靠的消息送达
+### 可靠的消息送达
 两个方向上的投递需要考虑可靠送达：
 + **publisher -> broker**
   + 设置durability for exchanges, queues and persistent for messages
