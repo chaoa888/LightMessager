@@ -25,6 +25,7 @@ namespace LightMessager.Helper
     {
         static ConnectionFactory factory;
         static IConnection connection;
+        static volatile int prepersist_count;
         static List<string> prepersist;
         static ConcurrentDictionary<Type, QueueInfo> dict_info;
         static ConcurrentDictionary<Type, object> dict_func;
@@ -52,6 +53,7 @@ namespace LightMessager.Helper
             #endregion
 
             prefetch_count = 5;
+            prepersist_count = 0;
             prepersist = new List<string>();
             dict_info = new ConcurrentDictionary<Type, QueueInfo>();
             dict_func = new ConcurrentDictionary<Type, object>();
@@ -206,16 +208,15 @@ namespace LightMessager.Helper
                 throw new ArgumentException("message.Source不允许为空");
             }
 
-            var msgId = string.Empty;
-            if (!PrePersistMessage(message, out msgId))
-            {
-                return false;
-            }
-
             using (var pooled = InnerCreateChannel<TMessage>())
             {
                 IModel channel = pooled.Channel;
-                pooled.PreRecord(msgId);
+                message.SeqNum = channel.NextPublishSeqNo;
+                var msgHash = string.Empty;
+                if (!PrePersistMessage(message, out msgHash))
+                {
+                    return false;
+                }
 
                 var exchange_name = string.Empty;
                 var route_key = string.Empty;
@@ -229,7 +230,7 @@ namespace LightMessager.Helper
                     EnsureQueue<TMessage>(channel, out exchange_name, out route_key, out queue_name);
                 }
 
-                message.ID = msgId;
+                message.ID = msgHash;
                 var json_str = Jil.JSON.SerializeDynamic(message, Jil.Options.IncludeInherited);
                 var bytes = Encoding.UTF8.GetBytes(json_str);
                 var props = channel.CreateBasicProperties();
@@ -276,8 +277,6 @@ namespace LightMessager.Helper
             using (var pooled = InnerCreateChannel<TMessage>())
             {
                 IModel channel = pooled.Channel;
-                pooled.PreRecord(msgId);
-
                 var exchange_name = string.Empty;
                 var route_key = string.Empty;
                 if (delaySend > 0)
@@ -338,13 +337,13 @@ namespace LightMessager.Helper
             }
             else
             {
-                prepersist.Add(knuthHash);
-                lock (lockobj)
+                if (Interlocked.Increment(ref prepersist_count) != 1000)
                 {
-                    if (prepersist.Count > 1000)
-                    {
-                        prepersist.RemoveRange(0, 950);
-                    }
+                    prepersist.Add(knuthHash);
+                }
+                else
+                {
+                    prepersist.RemoveRange(0, 950);
                 }
 
                 var model = MessageQueueHelper.GetModelBy(knuthHash);

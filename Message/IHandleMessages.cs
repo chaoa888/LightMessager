@@ -11,7 +11,12 @@ namespace LightMessager.Message
         [JilDirective(Ignore = true)]
         public string Source { set; get; }
 
+        [JilDirective(Ignore = true)]
+        internal ulong SeqNum { set; get; }
+
         internal bool NeedNAck { set; get; }
+
+        public DateTime PublishTime { set; get; }
 
         public DateTime CreatedTime { set; get; }
     }
