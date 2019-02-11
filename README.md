@@ -77,18 +77,23 @@ rabbitmq对于connection的恢复有一定的缺陷：
 两个方向上的投递需要考虑可靠送达：
 + **publisher -> broker**
   + 设置durability for exchanges, queues and persistent for messages
+  
   + 使用rabbitmq自带的*publisher confirms*机制，配合上一定的消息重发策略，比如：
 	+ resend if your connection is lost or some other crash occurs before you receive confirmation of receipt
 
 	+ 超时机制。请注意此时多次重试的超时时间间隔最好可以double一下，以避免dos攻击
+  
   + 一种情况是，broker拒绝了该条消息（basic.nack），这表明broker因为某种原因当前不能处理该条消息，并拒绝为该条消息的发送负责。此时，需要publisher自己来负责该条消息的后续处理，可能重发，也可能就此作废等。
-  + 作为一个准则，从recovery中恢复的publisher总是应该重传任何没有收到ack的消息。
 
 + **broker -> consumer**
-这个方向上可以使用*consumer ack*机制，要小心的是，
+  这个方向上可以使用*consumer ack*机制，要小心的是，
     > Acknowledgements with stale delivery tags will not be sent. Applications that use manual acknowledgements and automatic recovery must be capable of handling redeliveries.
 
-    网络异常的情况中连接执行recovery，此时delivery tags都会过期失效，rabbitmq客户端并不会发送带有过期tag的ack消息。这又会进一步导致rabbitmq broker重发所有没有收到ack确认的消息，因此consumer一定要能够处理重复达到的消息才行
+    + rabbitmq会针对重传的消息设置`redelivered`标志值，这意味这consumer可能在之前有处理过该条消息；为什么是可能，原因在于该条消息可能刚发送出去，还在传递过程中，整个连接就断开了！
+
+    + 网络异常的情况中连接执行recovery，此时delivery tags都会过期失效，rabbitmq客户端并不会发送带有过期tag的ack消息。这又会进一步导致rabbitmq broker重发所有没有收到ack确认的消息，因此consumer一定要能够处理重复达到的消息才行
+
+    
 
 
 
