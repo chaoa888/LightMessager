@@ -52,7 +52,7 @@ namespace LightMessager.Helper
             var configurationRoot = builder.Build();
             #endregion
 
-            prefetch_count = 5;
+            prefetch_count = 100;
             prepersist_count = 0;
             prepersist = new List<ulong>();
             dict_info = new ConcurrentDictionary<Type, QueueInfo>();
@@ -74,8 +74,7 @@ namespace LightMessager.Helper
         /// </summary>
         /// <typeparam name="TMessage">消息类型</typeparam>
         /// <typeparam name="THandler">消息处理器类型</typeparam>
-        /// <param name="delayProcess">延迟多少毫秒开始处理消息（用于并发较大的场景下，由队列分担消息处理端压力的情况）</param>
-        public static void RegisterHandler<TMessage, THandler>(int delayProcess = 0)
+        public static void RegisterHandler<TMessage, THandler>()
             where THandler : BaseHandleMessages<TMessage>
             where TMessage : BaseMessage
         {
@@ -87,24 +86,17 @@ namespace LightMessager.Helper
                     var obj = dict_func.GetOrAdd(type, t => Activator.CreateInstance<THandler>()) as THandler;
                     var channel = connection.CreateModel();
                     var consumer = new EventingBasicConsumer(channel);
-                    if (delayProcess > 0)
-                    {
-                        /*
-                          @param prefetchSize maximum amount of content (measured in octets) that the server will deliver, 0 if unlimited
-                          @param prefetchCount maximum number of messages that the server will deliver, 0 if unlimited
-                          @param global true if the settings should be applied to the entire channel rather than each consumer
-                        */
-                        channel.BasicQos(0, prefetch_count, false);
-                    }
-                    consumer.Received += (model, ea) =>
+                    /*
+                      @param prefetchSize maximum amount of content (measured in octets) that the server will deliver, 0 if unlimited
+                      @param prefetchCount maximum number of messages that the server will deliver, 0 if unlimited
+                      @param global true if the settings should be applied to the entire channel rather than each consumer
+                    */
+                    channel.BasicQos(0, prefetch_count, false);
+                    consumer.Received += async (model, ea) =>
                     {
                         var body = Encoding.UTF8.GetString(ea.Body);
                         var json = Jil.JSON.Deserialize<TMessage>(body);
-                        if (delayProcess > 0)
-                        {
-                            Thread.Sleep(delayProcess);
-                        }
-                        obj.Handle(json);
+                        await obj.Handle(json);
                         if (json.NeedNAck)
                         {
                             channel.BasicNack(ea.DeliveryTag, false, true);
@@ -124,7 +116,7 @@ namespace LightMessager.Helper
             }
             catch (Exception ex)
             {
-                _logger.Debug("RegisterHandler(int delayProcess = 0)出错，异常：" + ex.Message + "；堆栈：" + ex.StackTrace);
+                _logger.Debug("RegisterHandler()出错，异常：" + ex.Message + "；堆栈：" + ex.StackTrace);
             }
         }
 
@@ -134,8 +126,7 @@ namespace LightMessager.Helper
         /// <typeparam name="TMessage">消息类型</typeparam>
         /// <typeparam name="THandler">消息处理器类型</typeparam>
         /// <param name="subscriberName">subscriber名称</param>
-        /// <param name="delayProcess">延迟多少毫秒开始处理消息（用于并发较大的场景下，由队列分担消息处理端压力的情况）</param>
-        public static void RegisterHandlerAs<TMessage, THandler>(string subscriberName, int delayProcess = 0)
+        public static void RegisterHandlerAs<TMessage, THandler>(string subscriberName)
             where THandler : BaseHandleMessages<TMessage>
             where TMessage : BaseMessage
         {
@@ -152,24 +143,17 @@ namespace LightMessager.Helper
                     var obj = dict_func.GetOrAdd(type, t => Activator.CreateInstance<THandler>()) as THandler;
                     var channel = connection.CreateModel();
                     var consumer = new EventingBasicConsumer(channel);
-                    if (delayProcess > 0)
-                    {
-                        /*
-                          @param prefetchSize maximum amount of content (measured in octets) that the server will deliver, 0 if unlimited
-                          @param prefetchCount maximum number of messages that the server will deliver, 0 if unlimited
-                          @param global true if the settings should be applied to the entire channel rather than each consumer
-                        */
-                        channel.BasicQos(0, prefetch_count, false);
-                    }
-                    consumer.Received += (model, ea) =>
+                    /*
+                      @param prefetchSize maximum amount of content (measured in octets) that the server will deliver, 0 if unlimited
+                      @param prefetchCount maximum number of messages that the server will deliver, 0 if unlimited
+                      @param global true if the settings should be applied to the entire channel rather than each consumer
+                    */
+                    channel.BasicQos(0, prefetch_count, false);
+                    consumer.Received += async (model, ea) =>
                     {
                         var body = Encoding.UTF8.GetString(ea.Body);
                         var json = Jil.JSON.Deserialize<TMessage>(body);
-                        if (delayProcess > 0)
-                        {
-                            Thread.Sleep(delayProcess);
-                        }
-                        obj.Handle(json);
+                        await obj.Handle(json);
                         if (json.NeedNAck)
                         {
                             channel.BasicNack(ea.DeliveryTag, false, true);
@@ -189,7 +173,7 @@ namespace LightMessager.Helper
             }
             catch (Exception ex)
             {
-                _logger.Debug("RegisterHandler(string subscriberName, int delayProcess = 0)出错，异常：" + ex.Message + "；堆栈：" + ex.StackTrace);
+                _logger.Debug("RegisterHandler(string subscriberName)出错，异常：" + ex.Message + "；堆栈：" + ex.StackTrace);
             }
         }
 

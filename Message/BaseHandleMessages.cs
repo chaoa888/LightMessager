@@ -3,6 +3,7 @@ using NLog;
 using System;
 using System.Collections.Concurrent;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace LightMessager.Message
 {
@@ -10,39 +11,30 @@ namespace LightMessager.Message
         where TMessage : BaseMessage
     {
         private static Logger _logger = LogManager.GetLogger("MessageHandler");
-        private static readonly int retry_wait = 1000 * 2; // 2秒
+        private static readonly int retry_wait = 1000; // 1秒
         private static readonly ConcurrentDictionary<ulong, int> retry_list = new ConcurrentDictionary<ulong, int>();
 
-        public void Handle(TMessage message)
+        public async Task Handle(TMessage message)
         {
             var sleep = 0;
             try
             {
-                DoHandle(message);
+                await DoHandle(message);
             }
             catch (Exception<LightMessagerExceptionArgs> ex)
             {
                 // 如果异常设定了不能被吞掉，则进行延迟重试
                 if (!ex.Args.CanBeSwallow)
                 {
-                    var retry_count = 0;
-                    if (retry_list.TryGetValue(message.KnuthHash, out retry_count))
+                    var current_value = retry_list.AddOrUpdate(message.KnuthHash, 1, (key, oldValue) => oldValue * 2);
+                    if (current_value > 4) // 1, 2, 4 最大允许重试3次
                     {
-                        var new_value = retry_count * 2;
-                        retry_list.TryUpdate(message.KnuthHash, new_value, retry_count);
-                        if (new_value > 4) // 1, 2, 4 最大允许重试3次
-                        {
-                            _logger.Debug("重试超过最大次数(4)，异常：" + ex.Message + "；堆栈：" + ex.StackTrace);
-                        }
-                        else
-                        {
-                            sleep = retry_wait * new_value;
-                        }
+                        _logger.Debug("重试超过最大次数(3)，异常：" + ex.Message + "；堆栈：" + ex.StackTrace);
+                        retry_list.TryRemove(message.KnuthHash, out _);
                     }
                     else
                     {
-                        retry_list.GetOrAdd(message.KnuthHash, p => 1);
-                        sleep = retry_wait * 1;
+                        sleep = retry_wait * current_value;
                     }
                 }
                 else
@@ -63,7 +55,7 @@ namespace LightMessager.Message
             }
         }
 
-        protected virtual void DoHandle(TMessage message)
+        protected virtual Task DoHandle(TMessage message)
         {
             throw new NotImplementedException();
         }
