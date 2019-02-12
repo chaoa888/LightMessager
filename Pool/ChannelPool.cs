@@ -34,7 +34,7 @@ namespace LightMessager.Pool
             // 数据更新该条消息的状态信息
             var ret = MessageQueueHelper.Update(new MessageQueue
             {
-                //KnuthHash = e.DeliveryTag,
+                KnuthHash = e.DeliveryTag,
                 CanBeRemoved = true,
                 LastExecuteTime = DateTime.Now,
             });

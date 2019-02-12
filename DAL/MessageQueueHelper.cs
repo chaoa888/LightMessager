@@ -170,7 +170,7 @@ namespace LightMessager.DAL
         /// </summary>
 		/// <param name="msgHash"></param>
         /// <returns>MessageQueue实体</returns>
-        public static MessageQueue GetModelBy(string knuthHash)
+        public static MessageQueue GetModelBy(ulong knuthHash)
         {
             var sql = new StringBuilder();
             sql.Append("SELECT TOP 1 Id, KnuthHash, MsgContent, CanBeRemoved, ExecuteCount, LastExecuteTime, CreatedTime FROM MessageQueue ");

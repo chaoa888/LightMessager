@@ -11,7 +11,7 @@ namespace LightMessager.Message
     {
         private static Logger _logger = LogManager.GetLogger("MessageHandler");
         private static readonly int retry_wait = 1000 * 2; // 2秒
-        private static readonly ConcurrentDictionary<string, int> retry_list = new ConcurrentDictionary<string, int>();
+        private static readonly ConcurrentDictionary<ulong, int> retry_list = new ConcurrentDictionary<ulong, int>();
 
         public void Handle(TMessage message)
         {
@@ -23,13 +23,13 @@ namespace LightMessager.Message
             catch (Exception<LightMessagerExceptionArgs> ex)
             {
                 // 如果异常设定了不能被吞掉，则进行延迟重试
-                if (!ex.Args.CanBeSwallowed)
+                if (!ex.Args.CanBeSwallow)
                 {
                     var retry_count = 0;
-                    if (retry_list.TryGetValue(message.ID, out retry_count))
+                    if (retry_list.TryGetValue(message.KnuthHash, out retry_count))
                     {
                         var new_value = retry_count * 2;
-                        retry_list.TryUpdate(message.ID, new_value, retry_count);
+                        retry_list.TryUpdate(message.KnuthHash, new_value, retry_count);
                         if (new_value > 4) // 1, 2, 4 最大允许重试3次
                         {
                             _logger.Debug("重试超过最大次数(4)，异常：" + ex.Message + "；堆栈：" + ex.StackTrace);
@@ -41,7 +41,7 @@ namespace LightMessager.Message
                     }
                     else
                     {
-                        retry_list.GetOrAdd(message.ID, p => 1);
+                        retry_list.GetOrAdd(message.KnuthHash, p => 1);
                         sleep = retry_wait * 1;
                     }
                 }

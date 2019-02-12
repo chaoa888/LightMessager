@@ -11,7 +11,7 @@ namespace LightMessager.DAL
 		public MessageQueue()
 		{}
         private long _id;
-		private string _knuthhash;
+		private ulong _knuthhash;
 		private string _msgcontent;
 		private bool _canberemoved;
 		private short _executecount;
@@ -30,7 +30,7 @@ namespace LightMessager.DAL
         /// <summary>
         /// 
         /// </summary>
-        public string KnuthHash
+        public ulong KnuthHash
 		{
 			set { _knuthhash = value; }
 			get { return _knuthhash; }

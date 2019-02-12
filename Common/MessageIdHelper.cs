@@ -4,13 +4,14 @@ namespace LightMessager.Common
 {
     internal static class MessageIdHelper
     {
-        public static string GenerateMessageIdFrom(byte[] body)
+        public static ulong GenerateMessageIdFrom(byte[] body)
         {
-            if (body == null) return "MESSAGE-BODY-IS-NULL";
+            if (body == null)
+                throw new ArgumentNullException("body");
 
             var base64String = Convert.ToBase64String(body);
 
-            return $"knuth-{Knuth.CalculateHash(base64String)}";
+            return Knuth.CalculateHash(base64String);
         }
     }
 

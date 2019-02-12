@@ -7,7 +7,7 @@ namespace LightMessager.Exceptions
     [Serializable]
     public class LightMessagerExceptionArgs : ExceptionArgs
     {
-        public bool CanBeSwallowed { set; get; }
+        public bool CanBeSwallow { set; get; }
     }
 
     [Serializable]

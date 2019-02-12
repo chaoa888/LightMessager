@@ -6,7 +6,7 @@ namespace LightMessager.Message
 {
     public class BaseMessage
     {
-        public string ID { set; get; }
+        public ulong KnuthHash { set; get; }
 
         [JilDirective(Ignore = true)]
         public string Source { set; get; }

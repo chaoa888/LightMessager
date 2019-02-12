@@ -26,7 +26,7 @@ namespace LightMessager.Helper
         static ConnectionFactory factory;
         static IConnection connection;
         static volatile int prepersist_count;
-        static List<string> prepersist;
+        static List<ulong> prepersist;
         static ConcurrentDictionary<Type, QueueInfo> dict_info;
         static ConcurrentDictionary<Type, object> dict_func;
         static ConcurrentDictionary<Type, ObjectPool<IPooledWapper>> pools;
@@ -54,7 +54,7 @@ namespace LightMessager.Helper
 
             prefetch_count = 5;
             prepersist_count = 0;
-            prepersist = new List<string>();
+            prepersist = new List<ulong>();
             dict_info = new ConcurrentDictionary<Type, QueueInfo>();
             dict_func = new ConcurrentDictionary<Type, object>();
             pools = new ConcurrentDictionary<Type, ObjectPool<IPooledWapper>>();
@@ -205,15 +205,14 @@ namespace LightMessager.Helper
         {
             if (string.IsNullOrWhiteSpace(message.Source))
             {
-                throw new ArgumentException("message.Source不允许为空");
+                throw new ArgumentNullException("message.Source");
             }
 
             using (var pooled = InnerCreateChannel<TMessage>())
             {
                 IModel channel = pooled.Channel;
                 message.SeqNum = channel.NextPublishSeqNo;
-                var msgHash = string.Empty;
-                if (!PrePersistMessage(message, out msgHash))
+                if (!PrePersistMessage(message))
                 {
                     return false;
                 }
@@ -230,7 +229,6 @@ namespace LightMessager.Helper
                     EnsureQueue<TMessage>(channel, out exchange_name, out route_key, out queue_name);
                 }
 
-                message.ID = msgHash;
                 var json_str = Jil.JSON.SerializeDynamic(message, Jil.Options.IncludeInherited);
                 var bytes = Encoding.UTF8.GetBytes(json_str);
                 var props = channel.CreateBasicProperties();
@@ -268,8 +266,7 @@ namespace LightMessager.Helper
                 return Send(message);
             }
 
-            var msgId = string.Empty;
-            if (!PrePersistMessage(message, out msgId))
+            if (!PrePersistMessage(message))
             {
                 return false;
             }
@@ -288,7 +285,6 @@ namespace LightMessager.Helper
                     EnsureQueue<TMessage>(channel, out exchange_name, subscriberNames);
                 }
 
-                message.ID = msgId;
                 var json_str = Jil.JSON.SerializeDynamic(message, Jil.Options.IncludeInherited);
                 var bytes = Encoding.UTF8.GetBytes(json_str);
                 var props = channel.CreateBasicProperties();
@@ -315,28 +311,23 @@ namespace LightMessager.Helper
         private static PooledChannel InnerCreateChannel<TMessage>()
             where TMessage : BaseMessage
         {
-            var pool = pools.GetOrAdd(typeof(TMessage), t => new ObjectPool<IPooledWapper>(p => new PooledChannel(connection.CreateModel(), p), 10));
+            var pool = pools.GetOrAdd(
+                typeof(TMessage),
+                t => new ObjectPool<IPooledWapper>(p => new PooledChannel(connection.CreateModel(), p), 10));
             return pool.Get() as PooledChannel;
         }
 
-        private static bool PrePersistMessage<TMessage>(TMessage message, out string knuthHash)
+        private static bool PrePersistMessage<TMessage>(TMessage message)
             where TMessage : BaseMessage
         {
-            if (!string.IsNullOrWhiteSpace(message.ID))
-            {
-                knuthHash = message.ID;
-            }
-            else
-            {
-                knuthHash = MessageIdHelper.GenerateMessageIdFrom(Encoding.UTF8.GetBytes(message.Source));
-            }
-
+            var knuthHash = MessageIdHelper.GenerateMessageIdFrom(Encoding.UTF8.GetBytes(message.Source));
             if (prepersist.Contains(knuthHash))
             {
                 return false;
             }
             else
             {
+                message.KnuthHash = knuthHash;
                 if (Interlocked.Increment(ref prepersist_count) != 1000)
                 {
                     prepersist.Add(knuthHash);
@@ -354,7 +345,7 @@ namespace LightMessager.Helper
                 else
                 {
                     var now = DateTime.Now;
-                    var newmodel = new MessageQueue
+                    var new_model = new MessageQueue
                     {
                         KnuthHash = knuthHash,
                         CanBeRemoved = false,
@@ -363,7 +354,7 @@ namespace LightMessager.Helper
                         LastExecuteTime = now,
                         MsgContent = message.Source
                     };
-                    MessageQueueHelper.Insert(newmodel);
+                    MessageQueueHelper.Insert(new_model);
                     return true;
                 }
             }
