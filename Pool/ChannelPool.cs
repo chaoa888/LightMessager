@@ -2,7 +2,6 @@
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 using System;
-using System.Collections.Generic;
 
 namespace LightMessager.Pool
 {
@@ -32,16 +31,16 @@ namespace LightMessager.Pool
         private void Channel_BasicAcks(object sender, BasicAckEventArgs e)
         {
             // 数据更新该条消息的状态信息
-            var ret = MessageQueueHelper.Update(new MessageQueue
-            {
-                KnuthHash = e.DeliveryTag,
-                CanBeRemoved = true,
-                LastExecuteTime = DateTime.Now,
-            });
-            if (!ret)
-            {
-                // 日志记录
-            }
+            //var ret = MessageQueueHelper.Update(new MessageQueue
+            //{
+            //    KnuthHash = (ulong)e.DeliveryTag,
+            //    CanBeRemoved = true,
+            //    LastExecuteTime = DateTime.Now,
+            //});
+            //if (!ret)
+            //{
+            //    // 日志记录
+            //}
         }
 
         private void Channel_ModelShutdown(object sender, ShutdownEventArgs e)

@@ -93,7 +93,11 @@ rabbitmq对于connection的恢复有一定的缺陷：
 
     + 网络异常的情况中连接执行recovery，此时delivery tags都会过期失效，rabbitmq客户端并不会发送带有过期tag的ack消息。这又会进一步导致rabbitmq broker重发所有没有收到ack确认的消息，因此consumer一定要能够处理重复达到的消息才行
 
-    
+### Roadmap
++ 可靠消息投递
++ 延时发送
++ 效率改进
+	+ QoS, multiple
 
 
 

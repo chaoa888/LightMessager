@@ -2,42 +2,42 @@ using System;
 
 namespace LightMessager.DAL
 {
-    /// <summary>
-    /// 实体
-    /// </summary>
-    [Serializable]
-	internal class MessageQueue
+	/// <summary>
+	/// LightMessager专用消息落地表实体
+	/// </summary>
+	[Serializable]
+	public class MessageQueue
 	{
 		public MessageQueue()
 		{}
-        private long _id;
+		private int _id;
 		private ulong _knuthhash;
 		private string _msgcontent;
 		private bool _canberemoved;
-		private short _executecount;
-		private DateTime _lastexecutetime;
+		private short _retrycount;
+		private DateTime _lastretrytime;
 		private DateTime _createdtime;
 
-        /// <summary>
-		/// 
+		/// <summary>
+		/// Id
 		/// </summary>
-		public long Id
-        {
-            set { _id = value; }
-            get { return _id; }
-        }
+		public int Id
+		{
+			set { _id = value; }
+			get { return _id; }
+		}
 
-        /// <summary>
-        /// 
-        /// </summary>
-        public ulong KnuthHash
+		/// <summary>
+		/// KnuthHash
+		/// </summary>
+		public ulong KnuthHash
 		{
 			set { _knuthhash = value; }
 			get { return _knuthhash; }
 		}
 
 		/// <summary>
-		/// 
+		/// MsgContent
 		/// </summary>
 		public string MsgContent
 		{
@@ -46,7 +46,7 @@ namespace LightMessager.DAL
 		}
 
 		/// <summary>
-		/// 
+		/// CanBeRemoved
 		/// </summary>
 		public bool CanBeRemoved
 		{
@@ -55,25 +55,25 @@ namespace LightMessager.DAL
 		}
 
 		/// <summary>
-		/// 
+		/// ExecuteCount
 		/// </summary>
-		public short ExecuteCount
+		public short RetryCount
 		{
-			set { _executecount = value; }
-			get { return _executecount; }
+			set { _retrycount = value; }
+			get { return _retrycount; }
 		}
 
 		/// <summary>
-		/// 
+		/// LastExecuteTime
 		/// </summary>
-		public DateTime LastExecuteTime
+		public DateTime LastRetryTime
 		{
-			set { _lastexecutetime = value; }
-			get { return _lastexecutetime; }
+			set { _lastretrytime = value; }
+			get { return _lastretrytime; }
 		}
 
 		/// <summary>
-		/// 
+		/// CreatedTime
 		/// </summary>
 		public DateTime CreatedTime
 		{

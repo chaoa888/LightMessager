@@ -1,7 +1,3 @@
-/*
- *  2017-08-01 10:53:45
- *  本文件由生成工具自动生成，请勿随意修改内容除非你很清楚自己在做什么！
- */
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -11,18 +7,18 @@ using System.Data.SqlClient;
 
 namespace LightMessager.DAL
 {
-	internal partial class MessageQueueHelper : BaseTableHelper
+    internal partial class MessageQueueHelper : BaseTableHelper
 	{
-		/// <summary>
-		/// 是否存在指定的
-		/// </summary>
-		/// <param name="Id"></param>
-		/// <returns>是否存在，true为存在</returns>
-		public static bool Exists(int Id)
+        /// <summary>
+        /// 是否存在指定的MessageQueue实体对象
+        /// </summary>
+        /// <param name="Id">Id</param>
+        /// <returns>是否存在，true为存在</returns>
+        public static bool Exists(int Id)
 		{
 			var sql = new StringBuilder();
-			sql.Append("SELECT COUNT(1) FROM MessageQueue");
-			sql.Append(" WHERE Id=@Id ");
+			sql.Append("SELECT COUNT(1) FROM [MessageQueue]");
+			sql.Append(" WHERE [Id]=@Id ");
 			var ret = false;
 			using (var conn = GetOpenConnection())
 			{
@@ -32,31 +28,17 @@ namespace LightMessager.DAL
 			return ret;
 		}
 
-        public static bool Exists(string knuthHash)
-        {
-            var sql = new StringBuilder();
-            sql.Append("SELECT COUNT(1) FROM MessageQueue");
-            sql.Append(" WHERE KnuthHash=@KnuthHash and CanBeRemoved=@CanBeRemoved ");
-            var ret = false;
-            using (var conn = GetOpenConnection())
-            {
-                ret = conn.ExecuteScalar<int>(sql.ToString(), new { @KnuthHash = knuthHash, @CanBeRemoved = false }) > 0;
-            }
-
-            return ret;
-        }
-
         /// <summary>
-        /// 添加
+        /// 添加MessageQueue实体对象
         /// </summary>
-        /// <param name="model">实体</param>
+        /// <param name="model">MessageQueue实体</param>
         /// <returns>新插入数据的id</returns>
         public static int Insert(MessageQueue model, SqlConnection conn = null, SqlTransaction transaction = null)
         {
             var sql = new StringBuilder();
-            sql.Append("INSERT INTO MessageQueue(KnuthHash, MsgContent, CanBeRemoved, ExecuteCount, LastExecuteTime, CreatedTime)");
-            sql.Append(" OUTPUT INSERTED.Id ");
-            sql.Append("VALUES(@KnuthHash, @MsgContent, @CanBeRemoved, @ExecuteCount, @LastExecuteTime, @CreatedTime)");
+            sql.Append("INSERT INTO [MessageQueue]([KnuthHash], [MsgContent], [CanBeRemoved], [RetryCount], [LastRetryTime], [CreatedTime])");
+            sql.Append(" OUTPUT INSERTED.[Id] ");
+            sql.Append("VALUES(@KnuthHash, @MsgContent, @CanBeRemoved, @RetryCount, @LastRetryTime, @CreatedTime)");
             var ret = 0;
             if (conn != null)
             {
@@ -77,16 +59,16 @@ namespace LightMessager.DAL
             return ret;
         }
 
-		/// <summary>
-        /// 删除指定的
+        /// <summary>
+        /// 删除指定的MessageQueue实体对象
         /// </summary>
-		/// <param name="Id"></param>
+        /// <param name="Id">Id</param>
         /// <returns>是否成功，true为成功</returns>
         public static bool Delete(int Id)
         {
             var sql = new StringBuilder();
-            sql.Append("DELETE FROM MessageQueue ");
-            sql.Append(" WHERE Id=@Id ");
+            sql.Append("DELETE FROM [MessageQueue] ");
+            sql.Append(" WHERE [Id]=@Id ");
             var ret = false;
             using (var conn = GetOpenConnection())
             {
@@ -96,16 +78,16 @@ namespace LightMessager.DAL
             return ret;
         }
 
-		/// <summary>
-        /// 批量删除指定的
+        /// <summary>
+        /// 批量删除指定的MessageQueue实体对象
         /// </summary>
-        /// <param name="ids"> id列表</param>
+        /// <param name="ids">id列表</param>
         /// <returns>是否成功，true为成功</returns>
         public static bool Delete(List<int> ids)
         {
             var sql = new StringBuilder();
-            sql.Append("DELETE FROM MessageQueue ");
-            sql.Append(" WHERE Id IN @ids");
+            sql.Append("DELETE FROM [MessageQueue] ");
+            sql.Append(" WHERE [Id] IN @ids");
             var ret = false;
             using (var conn = GetOpenConnection())
             {
@@ -115,17 +97,33 @@ namespace LightMessager.DAL
             return ret;
         }
 
-		/// <summary>
-        /// 更新
+        /// <summary>
+        /// 更新指定的MessageQueue实体对象
         /// </summary>
-        /// <param name="model">实体</param>
+        /// <param name="model">MessageQueue实体</param>
+        /// <param name="fields">需要更新的字段名字</param>
         /// <returns>是否成功，true为成功</returns>
-        public static bool Update(MessageQueue model, SqlConnection conn = null, SqlTransaction transaction = null)
+        public static bool Update(MessageQueue model, IList<string> fields = null, SqlConnection conn = null, SqlTransaction transaction = null)
         {
             var sql = new StringBuilder();
-            sql.Append("UPDATE MessageQueue");
-            sql.Append(" SET CanBeRemoved=@CanBeRemoved, ExecuteCount=ExecuteCount+1, LastExecuteTime=@LastExecuteTime");
-            sql.Append(" WHERE KnuthHash=@KnuthHash");
+            sql.Append("UPDATE [MessageQueue]");
+            if (fields == null || fields.Count == 0)
+            {
+                 sql.Append(" SET [KnuthHash]=@KnuthHash, [MsgContent]=@MsgContent, [CanBeRemoved]=@CanBeRemoved, [RetryCount]=@RetryCount, [LastRetryTime]=@LastRetryTime, [CreatedTime]=@CreatedTime");
+            }
+            else
+            {
+                sql.Append(" SET ");
+                for (int i = 0; i < fields.Count; i++)
+                {
+                    sql.Append("[" + fields[i] + "]=@" + fields[i] + "");
+                    if (i != fields.Count - 1)
+                    {
+                        sql.Append(",");
+                    }
+                }
+            }
+            sql.Append(" WHERE [Id]=@Id");
             var ret = false;
             if (conn != null)
             {
@@ -147,33 +145,33 @@ namespace LightMessager.DAL
         }
 
         /// <summary>
-        /// 获取指定的
+        /// 获取指定的MessageQueue实体对象
         /// </summary>
-        /// <param name="Id"></param>
-        /// <returns>MessageQueue实体</returns>
+        /// <param name="Id">Id</param>
+        /// <returns>MessageQueue实体对象</returns>
         public static MessageQueue GetModel(int Id)
         {
             var sql = new StringBuilder();
-            sql.Append("SELECT TOP 1 Id, KnuthHash, MsgContent, CanBeRemoved, ExecuteCount, LastExecuteTime, CreatedTime FROM MessageQueue ");
-            sql.Append(" WHERE Id=@Id ");
+            sql.Append("SELECT TOP 1 [Id], [KnuthHash], [MsgContent], [CanBeRemoved], [RetryCount], [LastRetryTime], [CreatedTime] FROM [MessageQueue] ");
+            sql.Append(" WHERE [Id]=@Id ");
             MessageQueue ret = null;
             using (var conn = GetOpenConnection())
             {
-                ret = conn.QueryFirst<MessageQueue>(sql.ToString(), new { @Id=Id });
+                ret = conn.QueryFirstOrDefault<MessageQueue>(sql.ToString(), new { @Id=Id });
             }
 
             return ret;
         }
 
         /// <summary>
-        /// 获取指定的
+        /// 获取指定的MessageQueue实体对象
         /// </summary>
-		/// <param name="msgHash"></param>
-        /// <returns>MessageQueue实体</returns>
+        /// <param name="Id">Id</param>
+        /// <returns>MessageQueue实体对象</returns>
         public static MessageQueue GetModelBy(ulong knuthHash)
         {
             var sql = new StringBuilder();
-            sql.Append("SELECT TOP 1 Id, KnuthHash, MsgContent, CanBeRemoved, ExecuteCount, LastExecuteTime, CreatedTime FROM MessageQueue ");
+            sql.Append("SELECT TOP 1 Id, KnuthHash, MsgContent, CanBeRemoved, RetryCount, LastRetryTime, CreatedTime FROM MessageQueue ");
             sql.Append(" WHERE KnuthHash=@KnuthHash");
             MessageQueue ret = null;
             using (var conn = GetOpenConnection())
@@ -185,21 +183,25 @@ namespace LightMessager.DAL
         }
 
         /// <summary>
-        /// 批量获取
+        /// 批量获取MessageQueue实体对象
         /// </summary>
-        /// <param name="where">查询条件</param>
+        /// <param name="where">查询条件（不需要带有where关键字）</param>
         /// <param name="top">取出前top数的数据</param>
-        /// <returns>MessageQueue列表</returns>
+        /// <returns>MessageQueue实体对象列表</returns>
         public static List<MessageQueue> GetList(string where = "", int top = 100)
         {
             var sql = new StringBuilder();
             sql.Append("SELECT ");
             sql.Append(" TOP " + top.ToString());
-            sql.Append(" Id, KnuthHash, MsgContent, CanBeRemoved, ExecuteCount, LastExecuteTime, CreatedTime ");
-            sql.Append(" FROM MessageQueue ");
-            if (!string.IsNullOrWhiteSpace(where))
+            sql.Append(" [Id], [KnuthHash], [MsgContent], [CanBeRemoved], [RetryCount], [LastRetryTime], [CreatedTime] ");
+            sql.Append(" FROM [MessageQueue] ");
+			if (!string.IsNullOrWhiteSpace(where))
             {
-                sql.Append(" WHERE " + where);
+                if (where.ToLower().Contains("where"))
+                {
+                    throw new ArgumentException("where子句不需要带where关键字");
+                }
+				sql.Append(" WHERE " + where);
             }
             object ret = null;
             using (var conn = GetOpenConnection())
@@ -213,22 +215,18 @@ namespace LightMessager.DAL
 		/// <summary>
 		/// 获取记录总数
 		/// </summary>
-        protected static int GetRecordCount(string where = "")
+		/// <param name="where">查询条件（不需要带有where关键字）</param>
+        public static int GetCount(string where = "")
         {
             var sql = new StringBuilder();
-            sql.Append("SELECT COUNT(1) FROM MessageQueue ");
+            sql.Append("SELECT COUNT(1) FROM [MessageQueue] ");
             if (!string.IsNullOrWhiteSpace(where))
             {
-                if (!where.Trim().StartsWith("where", StringComparison.CurrentCultureIgnoreCase))
+                if (where.ToLower().Contains("where"))
                 {
-                    sql.Append(" WHERE " + where);
+                    throw new ArgumentException("where子句不需要带where关键字");
                 }
-                else
-                {
-                    sql.Append(" ");
-                    sql.Append(where);
-                    sql.Append(" ");
-                }
+				sql.Append(" WHERE " + where);
             }
             var ret = -1;
             using (var conn = GetOpenConnection())
@@ -246,5 +244,5 @@ namespace LightMessager.DAL
         {
             return Paged<MessageQueue>("MessageQueue", where, orderBy, columns, pageSize, currentPage);
         }
-    }
+	}
 }

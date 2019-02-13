@@ -21,11 +21,11 @@ namespace LightMessager.DAL
         {
             // 添加json配置文件路径
 #if LOCAL
-            var builder = new ConfigurationBuilder().SetBasePath(Directory.GetCurrentDirectory()).AddJsonFile("appsettings.Local.json");
+            var builder = new ConfigurationBuilder().SetBasePath(System.AppDomain.CurrentDomain.BaseDirectory).AddJsonFile("appsettings.Local.json");
 #elif DEBUG
-            var builder = new ConfigurationBuilder().SetBasePath(Directory.GetCurrentDirectory()).AddJsonFile("appsettings.Development.json");
+            var builder = new ConfigurationBuilder().SetBasePath(System.AppDomain.CurrentDomain.BaseDirectory).AddJsonFile("appsettings.Development.json");
 #else
-            var builder = new ConfigurationBuilder().SetBasePath(Directory.GetCurrentDirectory()).AddJsonFile("appsettings.json");
+            var builder = new ConfigurationBuilder().SetBasePath(System.AppDomain.CurrentDomain.BaseDirectory).AddJsonFile("appsettings.json");
 #endif
             // 创建配置根对象
             var configurationRoot = builder.Build();
@@ -69,6 +69,7 @@ namespace LightMessager.DAL
                 {
                     throw new ArgumentException("where子句不需要带where关键字");
                 }
+                where = " WHERE " + where;
             }
 
             var sql = string.Format("SELECT {0} FROM (SELECT ROW_NUMBER() OVER (ORDER BY {1}) AS Row, {0} FROM {2} {3}) AS Paged ", columns, orderBy, tableName, where);
@@ -110,6 +111,7 @@ namespace LightMessager.DAL
                 {
                     throw new ArgumentException("where子句不需要带where关键字");
                 }
+                where = " WHERE " + where;
             }
 
             var sql = string.Format("SELECT Paged.* FROM (SELECT ROW_NUMBER() OVER (ORDER BY {1}) AS Row, {0} FROM {2} {4} {3}) AS Paged ", columns, orderBy, tableName, where, joinStr);

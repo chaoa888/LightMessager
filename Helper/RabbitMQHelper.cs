@@ -27,6 +27,7 @@ namespace LightMessager.Helper
         static IConnection connection;
         static volatile int prepersist_count;
         static List<ulong> prepersist;
+        static ConcurrentQueue<ulong> retry_queue;
         static ConcurrentDictionary<Type, QueueInfo> dict_info;
         static ConcurrentDictionary<Type, object> dict_func;
         static ConcurrentDictionary<Type, ObjectPool<IPooledWapper>> pools;
@@ -35,7 +36,8 @@ namespace LightMessager.Helper
         static Logger _logger = LogManager.GetLogger("RabbitMQHelper");
 
         private RabbitMQHelper()
-        { }
+        {
+        }
 
         static RabbitMQHelper()
         {
@@ -55,6 +57,7 @@ namespace LightMessager.Helper
             prefetch_count = 100;
             prepersist_count = 0;
             prepersist = new List<ulong>();
+            retry_queue = new ConcurrentQueue<ulong>();
             dict_info = new ConcurrentDictionary<Type, QueueInfo>();
             dict_func = new ConcurrentDictionary<Type, object>();
             pools = new ConcurrentDictionary<Type, ObjectPool<IPooledWapper>>();
@@ -219,7 +222,12 @@ namespace LightMessager.Helper
                 props.ContentType = "text/plain";
                 props.DeliveryMode = 2;
                 channel.BasicPublish(exchange_name, route_key, props, bytes);
-                channel.WaitForConfirms();
+
+                var ret = channel.WaitForConfirms(TimeSpan.FromSeconds(10));
+                if (!ret)
+                {
+
+                }
             }
 
             return true;
@@ -304,43 +312,49 @@ namespace LightMessager.Helper
         private static bool PrePersistMessage<TMessage>(TMessage message)
             where TMessage : BaseMessage
         {
-            var knuthHash = MessageIdHelper.GenerateMessageIdFrom(Encoding.UTF8.GetBytes(message.Source));
-            if (prepersist.Contains(knuthHash))
+            if (message.RetryCount == 0)
             {
-                return false;
-            }
-            else
-            {
-                message.KnuthHash = knuthHash;
-                if (Interlocked.Increment(ref prepersist_count) != 1000)
-                {
-                    prepersist.Add(knuthHash);
-                }
-                else
-                {
-                    prepersist.RemoveRange(0, 950);
-                }
-
-                var model = MessageQueueHelper.GetModelBy(knuthHash);
-                if (model != null)
+                var knuthHash = MessageIdHelper.GenerateMessageIdFrom(Encoding.UTF8.GetBytes(message.Source));
+                if (prepersist.Contains(knuthHash))
                 {
                     return false;
                 }
                 else
                 {
-                    var now = DateTime.Now;
-                    var new_model = new MessageQueue
+                    message.KnuthHash = knuthHash;
+                    if (Interlocked.Increment(ref prepersist_count) != 1000)
                     {
-                        KnuthHash = knuthHash,
-                        CanBeRemoved = false,
-                        CreatedTime = now,
-                        ExecuteCount = 0,
-                        LastExecuteTime = now,
-                        MsgContent = message.Source
-                    };
-                    MessageQueueHelper.Insert(new_model);
-                    return true;
+                        prepersist.Add(knuthHash);
+                    }
+                    else
+                    {
+                        prepersist.RemoveRange(0, 950);
+                    }
+
+                    var model = MessageQueueHelper.GetModelBy(knuthHash);
+                    if (model != null)
+                    {
+                        return false;
+                    }
+                    else
+                    {
+                        var now = DateTime.Now;
+                        var new_model = new MessageQueue
+                        {
+                            KnuthHash = knuthHash,
+                            CanBeRemoved = false,
+                            CreatedTime = now,
+                            RetryCount = 0,
+                            MsgContent = message.Source
+                        };
+                        MessageQueueHelper.Insert(new_model);
+                        return true;
+                    }
                 }
+            }
+            else // RetryCount > 0
+            {
+                return false;
             }
         }
 
