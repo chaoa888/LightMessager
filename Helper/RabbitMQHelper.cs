@@ -74,7 +74,7 @@ namespace LightMessager.Helper
             connection = factory.CreateConnection();
 
             // 开启轮询检测，扫描重试队列，重发消息
-            new Thread(() => 
+            new Thread(() =>
             {
                 // 先实现为spin的方式，后面考虑换成blockingqueue的方式
                 while (true)
@@ -212,15 +212,15 @@ namespace LightMessager.Helper
                 throw new ArgumentNullException("message.Source");
             }
 
+            if (!PrePersistMessage(message))
+            {
+                return false;
+            }
+
             using (var pooled = InnerCreateChannel<TMessage>())
             {
                 IModel channel = pooled.Channel;
                 message.DeliveryTag = channel.NextPublishSeqNo;
-                if (!PrePersistMessage(message))
-                {
-                    return false;
-                }
-
                 var exchange_name = string.Empty;
                 var route_key = string.Empty;
                 var queue_name = string.Empty;
@@ -274,19 +274,20 @@ namespace LightMessager.Helper
                 throw new ArgumentException("subscriberNames不允许为空");
             }
 
-            if (subscriberNames.Length == 1)
-            {
-                return Send(message);
-            }
-
             if (!PrePersistMessage(message))
             {
                 return false;
             }
 
+            if (subscriberNames.Length == 1)
+            {
+                return Send(message);
+            }
+
             using (var pooled = InnerCreateChannel<TMessage>())
             {
                 IModel channel = pooled.Channel;
+                message.DeliveryTag = channel.NextPublishSeqNo;
                 var exchange_name = string.Empty;
                 var route_key = string.Empty;
                 if (delaySend > 0)
