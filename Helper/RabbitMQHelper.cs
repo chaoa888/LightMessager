@@ -86,7 +86,7 @@ namespace LightMessager.Helper
                     }
                     Thread.Sleep(1000 * 5);
                 }
-            });
+            }).Start();
         }
 
         /// <summary>
@@ -103,7 +103,7 @@ namespace LightMessager.Helper
                 var type = typeof(TMessage);
                 if (!dict_func.ContainsKey(type))
                 {
-                    var obj = dict_func.GetOrAdd(type, t => Activator.CreateInstance<THandler>()) as THandler;
+                    var handler = dict_func.GetOrAdd(type, t => Activator.CreateInstance<THandler>()) as THandler;
                     var channel = connection.CreateModel();
                     var consumer = new EventingBasicConsumer(channel);
                     /*
@@ -116,7 +116,7 @@ namespace LightMessager.Helper
                     {
                         var body = Encoding.UTF8.GetString(ea.Body);
                         var json = Jil.JSON.Deserialize<TMessage>(body);
-                        await obj.Handle(json);
+                        await handler.Handle(json);
                         if (json.NeedNAck)
                         {
                             channel.BasicNack(ea.DeliveryTag, false, true);
@@ -160,7 +160,7 @@ namespace LightMessager.Helper
                 var type = typeof(TMessage);
                 if (!dict_func.ContainsKey(type))
                 {
-                    var obj = dict_func.GetOrAdd(type, t => Activator.CreateInstance<THandler>()) as THandler;
+                    var handler = dict_func.GetOrAdd(type, t => Activator.CreateInstance<THandler>()) as THandler;
                     var channel = connection.CreateModel();
                     var consumer = new EventingBasicConsumer(channel);
                     /*
@@ -173,7 +173,7 @@ namespace LightMessager.Helper
                     {
                         var body = Encoding.UTF8.GetString(ea.Body);
                         var json = Jil.JSON.Deserialize<TMessage>(body);
-                        await obj.Handle(json);
+                        await handler.Handle(json);
                         if (json.NeedNAck)
                         {
                             channel.BasicNack(ea.DeliveryTag, false, true);

@@ -4,6 +4,7 @@
 ### 基本概念
 
 ##### exchange
+一条消息的转发是由*exchange*的类型和具体的转发规则（*bindings*）共同决定的
 + **类型**
     + ***direct***：msg的routekey跟queue绑定的routekey一致，则直接转发
     + ***fanout***：忽略routekey，挂多少个queue就转发多少个msg，类似于广播
@@ -52,7 +53,7 @@
 
 ### 自动恢复
 
-rabbitmq自带有automatic recovery特性，能在网络发生异常时进行自我恢复。这包括连接的恢复和网络拓扑（topology）（queues、exchanges、bingds and consumers）的恢复（注意）。
+rabbitmq自带有automatic recovery特性，能在网络发生异常时进行自我恢复。这包括连接的恢复和网络拓扑（topology）（queues、exchanges、bindings and consumers）的恢复（注意）。
 
 通常来说可能导致automatic recovery的事件有：
 + An I/O exception is thrown in connection's I/O loop
