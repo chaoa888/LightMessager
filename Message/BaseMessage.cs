@@ -13,13 +13,13 @@ namespace LightMessager.Message
         public string Source { set; get; }
 
         [JilDirective(Ignore = true)]
-        internal ulong SeqNum { set; get; }
+        internal ulong DeliveryTag { set; get; }
 
         internal bool NeedNAck { set; get; }
 
         internal int RetryCount { set; get; }
 
-        internal DateTime PublishTime { set; get; }
+        internal DateTime LastRetryTime { set; get; }
 
         public DateTime CreatedTime { set; get; }
     }

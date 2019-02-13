@@ -26,8 +26,9 @@ namespace LightMessager.Helper
         static ConnectionFactory factory;
         static IConnection connection;
         static volatile int prepersist_count;
+        static readonly int default_retry_wait;
         static List<ulong> prepersist;
-        static ConcurrentQueue<ulong> retry_queue;
+        static ConcurrentQueue<BaseMessage> retry_queue;
         static ConcurrentDictionary<Type, QueueInfo> dict_info;
         static ConcurrentDictionary<Type, object> dict_func;
         static ConcurrentDictionary<Type, ObjectPool<IPooledWapper>> pools;
@@ -56,8 +57,9 @@ namespace LightMessager.Helper
 
             prefetch_count = 100;
             prepersist_count = 0;
+            default_retry_wait = 1000; // 1秒
             prepersist = new List<ulong>();
-            retry_queue = new ConcurrentQueue<ulong>();
+            retry_queue = new ConcurrentQueue<BaseMessage>();
             dict_info = new ConcurrentDictionary<Type, QueueInfo>();
             dict_func = new ConcurrentDictionary<Type, object>();
             pools = new ConcurrentDictionary<Type, ObjectPool<IPooledWapper>>();
@@ -70,6 +72,21 @@ namespace LightMessager.Helper
             factory.AutomaticRecoveryEnabled = true;
             factory.NetworkRecoveryInterval = TimeSpan.FromSeconds(30);
             connection = factory.CreateConnection();
+
+            // 开启轮询检测，扫描重试队列，重发消息
+            new Thread(() => 
+            {
+                // 先实现为spin的方式，后面考虑换成blockingqueue的方式
+                while (true)
+                {
+                    BaseMessage item;
+                    while (retry_queue.TryDequeue(out item))
+                    {
+                        Send(item);
+                    }
+                    Thread.Sleep(1000 * 5);
+                }
+            });
         }
 
         /// <summary>
@@ -198,7 +215,7 @@ namespace LightMessager.Helper
             using (var pooled = InnerCreateChannel<TMessage>())
             {
                 IModel channel = pooled.Channel;
-                message.SeqNum = channel.NextPublishSeqNo;
+                message.DeliveryTag = channel.NextPublishSeqNo;
                 if (!PrePersistMessage(message))
                 {
                     return false;
@@ -222,11 +239,15 @@ namespace LightMessager.Helper
                 props.ContentType = "text/plain";
                 props.DeliveryMode = 2;
                 channel.BasicPublish(exchange_name, route_key, props, bytes);
-
-                var ret = channel.WaitForConfirms(TimeSpan.FromSeconds(10));
+                var time_out = Math.Max(default_retry_wait, message.RetryCount * 1000);
+                var ret = channel.WaitForConfirms(TimeSpan.FromMilliseconds(time_out));
                 if (!ret)
                 {
-
+                    message.DeliveryTag = 0; // 重置为0
+                    message.RetryCount = Math.Max(1, message.RetryCount);
+                    message.RetryCount *= 2;
+                    message.LastRetryTime = DateTime.Now;
+                    retry_queue.Enqueue(message);
                 }
             }
 
@@ -338,12 +359,11 @@ namespace LightMessager.Helper
                     }
                     else
                     {
-                        var now = DateTime.Now;
                         var new_model = new MessageQueue
                         {
                             KnuthHash = knuthHash,
                             CanBeRemoved = false,
-                            CreatedTime = now,
+                            CreatedTime = DateTime.Now,
                             RetryCount = 0,
                             MsgContent = message.Source
                         };
@@ -354,7 +374,8 @@ namespace LightMessager.Helper
             }
             else // RetryCount > 0
             {
-                return false;
+                // 直接返回true，以便后续可以进行重发
+                return true;
             }
         }
 

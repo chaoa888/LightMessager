@@ -1,5 +1,4 @@
-﻿using LightMessager.DAL;
-using RabbitMQ.Client;
+﻿using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 using System;
 

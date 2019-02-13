@@ -8,25 +8,25 @@ using System.Data.SqlClient;
 namespace LightMessager.DAL
 {
     internal partial class MessageQueueHelper : BaseTableHelper
-	{
+    {
         /// <summary>
         /// 是否存在指定的MessageQueue实体对象
         /// </summary>
         /// <param name="Id">Id</param>
         /// <returns>是否存在，true为存在</returns>
         public static bool Exists(int Id)
-		{
-			var sql = new StringBuilder();
-			sql.Append("SELECT COUNT(1) FROM [MessageQueue]");
-			sql.Append(" WHERE [Id]=@Id ");
-			var ret = false;
-			using (var conn = GetOpenConnection())
-			{
-				ret = conn.ExecuteScalar<int>(sql.ToString(), new { @Id=Id }) > 0;
-			}
+        {
+            var sql = new StringBuilder();
+            sql.Append("SELECT COUNT(1) FROM [MessageQueue]");
+            sql.Append(" WHERE [Id]=@Id ");
+            var ret = false;
+            using (var conn = GetOpenConnection())
+            {
+                ret = conn.ExecuteScalar<int>(sql.ToString(), new { @Id = Id }) > 0;
+            }
 
-			return ret;
-		}
+            return ret;
+        }
 
         /// <summary>
         /// 添加MessageQueue实体对象
@@ -72,7 +72,7 @@ namespace LightMessager.DAL
             var ret = false;
             using (var conn = GetOpenConnection())
             {
-                ret = conn.Execute(sql.ToString(), new { @Id=Id }) > 0;
+                ret = conn.Execute(sql.ToString(), new { @Id = Id }) > 0;
             }
 
             return ret;
@@ -109,7 +109,7 @@ namespace LightMessager.DAL
             sql.Append("UPDATE [MessageQueue]");
             if (fields == null || fields.Count == 0)
             {
-                 sql.Append(" SET [KnuthHash]=@KnuthHash, [MsgContent]=@MsgContent, [CanBeRemoved]=@CanBeRemoved, [RetryCount]=@RetryCount, [LastRetryTime]=@LastRetryTime, [CreatedTime]=@CreatedTime");
+                sql.Append(" SET [KnuthHash]=@KnuthHash, [MsgContent]=@MsgContent, [CanBeRemoved]=@CanBeRemoved, [RetryCount]=@RetryCount, [LastRetryTime]=@LastRetryTime, [CreatedTime]=@CreatedTime");
             }
             else
             {
@@ -147,9 +147,9 @@ namespace LightMessager.DAL
         /// <summary>
         /// 获取指定的MessageQueue实体对象
         /// </summary>
-        /// <param name="Id">Id</param>
+        /// <param name="id">id</param>
         /// <returns>MessageQueue实体对象</returns>
-        public static MessageQueue GetModel(int Id)
+        public static MessageQueue GetModel(int id)
         {
             var sql = new StringBuilder();
             sql.Append("SELECT TOP 1 [Id], [KnuthHash], [MsgContent], [CanBeRemoved], [RetryCount], [LastRetryTime], [CreatedTime] FROM [MessageQueue] ");
@@ -157,7 +157,7 @@ namespace LightMessager.DAL
             MessageQueue ret = null;
             using (var conn = GetOpenConnection())
             {
-                ret = conn.QueryFirstOrDefault<MessageQueue>(sql.ToString(), new { @Id=Id });
+                ret = conn.QueryFirstOrDefault<MessageQueue>(sql.ToString(), new { @Id = id });
             }
 
             return ret;
@@ -195,13 +195,13 @@ namespace LightMessager.DAL
             sql.Append(" TOP " + top.ToString());
             sql.Append(" [Id], [KnuthHash], [MsgContent], [CanBeRemoved], [RetryCount], [LastRetryTime], [CreatedTime] ");
             sql.Append(" FROM [MessageQueue] ");
-			if (!string.IsNullOrWhiteSpace(where))
+            if (!string.IsNullOrWhiteSpace(where))
             {
                 if (where.ToLower().Contains("where"))
                 {
                     throw new ArgumentException("where子句不需要带where关键字");
                 }
-				sql.Append(" WHERE " + where);
+                sql.Append(" WHERE " + where);
             }
             object ret = null;
             using (var conn = GetOpenConnection())
@@ -212,10 +212,10 @@ namespace LightMessager.DAL
             return (List<MessageQueue>)ret;
         }
 
-		/// <summary>
-		/// 获取记录总数
-		/// </summary>
-		/// <param name="where">查询条件（不需要带有where关键字）</param>
+        /// <summary>
+        /// 获取记录总数
+        /// </summary>
+        /// <param name="where">查询条件（不需要带有where关键字）</param>
         public static int GetCount(string where = "")
         {
             var sql = new StringBuilder();
@@ -226,7 +226,7 @@ namespace LightMessager.DAL
                 {
                     throw new ArgumentException("where子句不需要带where关键字");
                 }
-				sql.Append(" WHERE " + where);
+                sql.Append(" WHERE " + where);
             }
             var ret = -1;
             using (var conn = GetOpenConnection())
@@ -237,12 +237,12 @@ namespace LightMessager.DAL
             return ret;
         }
 
-		/// <summary>
-		/// 分页获取数据列表
-		/// </summary>
-		public static PageDataView<MessageQueue> GetListByPage(string where = "", string orderBy = "", string columns = " * ", int pageSize = 20, int currentPage = 1)
+        /// <summary>
+        /// 分页获取数据列表
+        /// </summary>
+        public static PageDataView<MessageQueue> GetListByPage(string where = "", string orderBy = "", string columns = " * ", int pageSize = 20, int currentPage = 1)
         {
             return Paged<MessageQueue>("MessageQueue", where, orderBy, columns, pageSize, currentPage);
         }
-	}
+    }
 }
