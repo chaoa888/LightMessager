@@ -37,8 +37,7 @@ namespace LightMessager.Helper
         static Logger _logger = LogManager.GetLogger("RabbitMQHelper");
 
         private RabbitMQHelper()
-        {
-        }
+        { }
 
         static RabbitMQHelper()
         {
@@ -70,7 +69,7 @@ namespace LightMessager.Helper
             factory.HostName = configurationRoot.GetSection("LightMessager:HostName").Value; // "127.0.0.1";
             factory.Port = int.Parse(configurationRoot.GetSection("LightMessager:Port").Value); // 5672;
             factory.AutomaticRecoveryEnabled = true;
-            factory.NetworkRecoveryInterval = TimeSpan.FromSeconds(30);
+            factory.NetworkRecoveryInterval = TimeSpan.FromSeconds(15);
             connection = factory.CreateConnection();
 
             // 开启轮询检测，扫描重试队列，重发消息
@@ -114,10 +113,10 @@ namespace LightMessager.Helper
                     channel.BasicQos(0, prefetch_count, false);
                     consumer.Received += async (model, ea) =>
                     {
-                        var body = Encoding.UTF8.GetString(ea.Body);
-                        var json = Jil.JSON.Deserialize<TMessage>(body);
-                        await handler.Handle(json);
-                        if (json.NeedNAck)
+                        var json = Encoding.UTF8.GetString(ea.Body);
+                        var msg = Jil.JSON.Deserialize<TMessage>(json);
+                        await handler.Handle(msg);
+                        if (msg.NeedNAck)
                         {
                             channel.BasicNack(ea.DeliveryTag, false, true);
                         }
@@ -127,11 +126,11 @@ namespace LightMessager.Helper
                         }
                     };
 
-                    var exchange_name = string.Empty;
+                    var exchange = string.Empty;
                     var route_key = string.Empty;
-                    var queue_name = string.Empty;
-                    EnsureQueue<TMessage>(channel, out exchange_name, out route_key, out queue_name);
-                    channel.BasicConsume(queue_name, false, consumer);
+                    var queue = string.Empty;
+                    EnsureQueue<TMessage>(channel, out exchange, out route_key, out queue);
+                    channel.BasicConsume(queue, false, consumer);
                 }
             }
             catch (Exception ex)
@@ -141,22 +140,28 @@ namespace LightMessager.Helper
         }
 
         /// <summary>
-        /// 注册消息处理器，并作为subscriber接收消息
+        /// 注册消息处理器，根据模式匹配接收消息
         /// </summary>
         /// <typeparam name="TMessage">消息类型</typeparam>
         /// <typeparam name="THandler">消息处理器类型</typeparam>
-        /// <param name="subscriberName">subscriber名称</param>
-        public static void RegisterHandlerAs<TMessage, THandler>(string subscriberName)
+        /// <param name="subscriberName">订阅器的名称</param>
+        /// <param name="subscribePatterns">订阅器支持的消息模式</param>
+        public static void RegisterHandlerAs<TMessage, THandler>(string subscriberName, params string[] subscribePatterns)
             where THandler : BaseHandleMessages<TMessage>
             where TMessage : BaseMessage
         {
+            if (string.IsNullOrWhiteSpace(subscriberName))
+            {
+                throw new ArgumentException("subscriberName不允许为空");
+            }
+
+            if (subscribePatterns == null || subscribePatterns.Length == 0)
+            {
+                throw new ArgumentException("subscribePatterns不允许为空");
+            }
+
             try
             {
-                if (string.IsNullOrWhiteSpace(subscriberName))
-                {
-                    throw new ArgumentNullException("subscriberName");
-                }
-
                 var type = typeof(TMessage);
                 if (!dict_func.ContainsKey(type))
                 {
@@ -171,10 +176,10 @@ namespace LightMessager.Helper
                     channel.BasicQos(0, prefetch_count, false);
                     consumer.Received += async (model, ea) =>
                     {
-                        var body = Encoding.UTF8.GetString(ea.Body);
-                        var json = Jil.JSON.Deserialize<TMessage>(body);
-                        await handler.Handle(json);
-                        if (json.NeedNAck)
+                        var json = Encoding.UTF8.GetString(ea.Body);
+                        var msg = Jil.JSON.Deserialize<TMessage>(json);
+                        await handler.Handle(msg);
+                        if (msg.NeedNAck)
                         {
                             channel.BasicNack(ea.DeliveryTag, false, true);
                         }
@@ -184,11 +189,10 @@ namespace LightMessager.Helper
                         }
                     };
 
-                    var exchange_name = string.Empty;
-                    var route_key = string.Empty;
-                    var queue_name = string.Empty;
-                    EnsureQueue<TMessage>(channel, out exchange_name, subscriberName);
-                    channel.BasicConsume(subscriberName + "." + type.Name + ".input", false, consumer);
+                    var exchange = string.Empty;
+                    var queue = string.Empty;
+                    EnsureQueue<TMessage>(channel, subscriberName, out exchange, out queue, subscribePatterns);
+                    channel.BasicConsume(queue, false, consumer);
                 }
             }
             catch (Exception ex)
@@ -217,28 +221,29 @@ namespace LightMessager.Helper
                 return false;
             }
 
+            delaySend = Math.Max(delaySend, 1000); // 至少保证1秒的延迟，否则意义不大
             using (var pooled = InnerCreateChannel<TMessage>())
             {
                 IModel channel = pooled.Channel;
                 message.DeliveryTag = channel.NextPublishSeqNo;
-                var exchange_name = string.Empty;
+                var exchange = string.Empty;
                 var route_key = string.Empty;
-                var queue_name = string.Empty;
+                var queue = string.Empty;
                 if (delaySend > 0)
                 {
-                    EnsureQueue<TMessage>(channel, delaySend, out exchange_name, out route_key, out queue_name);
+                    EnsureQueue<TMessage>(channel, delaySend, out route_key);
                 }
                 else
                 {
-                    EnsureQueue<TMessage>(channel, out exchange_name, out route_key, out queue_name);
+                    EnsureQueue<TMessage>(channel, out exchange, out route_key, out queue);
                 }
 
-                var json_str = Jil.JSON.SerializeDynamic(message, Jil.Options.IncludeInherited);
-                var bytes = Encoding.UTF8.GetBytes(json_str);
+                var json = Jil.JSON.SerializeDynamic(message, Jil.Options.IncludeInherited);
+                var bytes = Encoding.UTF8.GetBytes(json);
                 var props = channel.CreateBasicProperties();
                 props.ContentType = "text/plain";
                 props.DeliveryMode = 2;
-                channel.BasicPublish(exchange_name, route_key, props, bytes);
+                channel.BasicPublish(exchange, route_key, props, bytes);
                 var time_out = Math.Max(default_retry_wait, message.RetryCount * 1000);
                 var ret = channel.WaitForConfirms(TimeSpan.FromMilliseconds(time_out));
                 if (!ret)
@@ -255,13 +260,14 @@ namespace LightMessager.Helper
         }
 
         /// <summary>
-        /// 发布消息到指定的subscriber
+        /// 发布一条消息
         /// </summary>
-        /// <typeparam name="TMessage">消息类型</typeparam>
+        /// <typeparam name="TMessage"></typeparam>
         /// <param name="message">消息</param>
-        /// <param name="subscriberNames">subscriber名称</param>
-        /// <returns>发送成功返回true，否则返回false</returns>
-        public static bool Publish<TMessage>(TMessage message, int delaySend = 0, params string[] subscriberNames)
+        /// <param name="pattern">消息满足的模式（也就是routeKey）</param>
+        /// <param name="delaySend">延迟多少毫秒发布消息</param>
+        /// <returns>发布成功返回true，否则返回false</returns>
+        public static bool Publish<TMessage>(TMessage message, string pattern, int delaySend = 0)
             where TMessage : BaseMessage
         {
             if (string.IsNullOrWhiteSpace(message.Source))
@@ -269,9 +275,9 @@ namespace LightMessager.Helper
                 throw new ArgumentException("message.Source不允许为空");
             }
 
-            if (subscriberNames == null || subscriberNames.Length == 0)
+            if (string.IsNullOrWhiteSpace(pattern))
             {
-                throw new ArgumentException("subscriberNames不允许为空");
+                throw new ArgumentException("pattern不允许为空");
             }
 
             if (!PrePersistMessage(message))
@@ -279,43 +285,37 @@ namespace LightMessager.Helper
                 return false;
             }
 
-            if (subscriberNames.Length == 1)
-            {
-                return Send(message);
-            }
-
+            delaySend = Math.Max(delaySend, 1000); // 至少保证1秒的延迟，否则意义不大
             using (var pooled = InnerCreateChannel<TMessage>())
             {
                 IModel channel = pooled.Channel;
                 message.DeliveryTag = channel.NextPublishSeqNo;
-                var exchange_name = string.Empty;
+                var exchange = string.Empty;
                 var route_key = string.Empty;
+                var queue = string.Empty;
                 if (delaySend > 0)
                 {
-                    EnsureQueue<TMessage>(channel, delaySend, out exchange_name, out route_key, subscriberNames);
+                    EnsureQueue<TMessage>(channel, delaySend, pattern, out exchange);
                 }
                 else
                 {
-                    EnsureQueue<TMessage>(channel, out exchange_name, subscriberNames);
+                    EnsureQueue<TMessage>(channel, out exchange);
                 }
 
-                var json_str = Jil.JSON.SerializeDynamic(message, Jil.Options.IncludeInherited);
-                var bytes = Encoding.UTF8.GetBytes(json_str);
+                var json = Jil.JSON.SerializeDynamic(message, Jil.Options.IncludeInherited);
+                var bytes = Encoding.UTF8.GetBytes(json);
                 var props = channel.CreateBasicProperties();
                 props.ContentType = "text/plain";
                 props.DeliveryMode = 2;
                 if (delaySend > 0)
                 {
-                    channel.BasicPublish(exchange_name, route_key, props, bytes);
+                    channel.BasicPublish(exchange, pattern, props, bytes);
                     channel.WaitForConfirms();
                 }
                 else
                 {
-                    foreach (var subscriber in subscriberNames)
-                    {
-                        channel.BasicPublish(exchange_name, "topic." + subscriber, props, bytes);
-                        channel.WaitForConfirms();
-                    }
+                    channel.BasicPublish(exchange, pattern, props, bytes);
+                    channel.WaitForConfirms();
                 }
             }
 
@@ -363,10 +363,10 @@ namespace LightMessager.Helper
                         var new_model = new MessageQueue
                         {
                             KnuthHash = knuthHash,
+                            MsgContent = message.Source,
+                            RetryCount = 0,
                             CanBeRemoved = false,
                             CreatedTime = DateTime.Now,
-                            RetryCount = 0,
-                            MsgContent = message.Source
                         };
                         MessageQueueHelper.Insert(new_model);
                         return true;
@@ -380,131 +380,113 @@ namespace LightMessager.Helper
             }
         }
 
-        private static void EnsureQueue<TMessage>(IModel channel, out string exchangeName, out string routeKey, out string queueName)
+        private static void EnsureQueue<TMessage>(IModel channel, out string exchange, out string routeKey, out string queue)
             where TMessage : BaseMessage
         {
             var type = typeof(TMessage);
             if (!dict_info.ContainsKey(type))
             {
                 var info = GetQueueInfo(type);
-                exchangeName = info.ExchangeName;
-                routeKey = info.RouteKeyName;
-                queueName = info.QueueName;
+                exchange = info.Exchange;
+                routeKey = info.DefaultRouteKey;
+                queue = info.Queue;
 
-                channel.ExchangeDeclare(exchangeName, ExchangeType.Direct);
-                channel.QueueDeclare(queueName, false, false, false);
-                channel.QueueBind(queueName, exchangeName, routeKey);
+                channel.ExchangeDeclare(exchange, ExchangeType.Direct, durable: true);
+                channel.QueueDeclare(queue, durable: true, exclusive: false, autoDelete: false);
+                channel.QueueBind(queue, exchange, routeKey);
             }
             else
             {
                 var info = GetQueueInfo(type);
-                exchangeName = info.ExchangeName;
-                queueName = info.QueueName;
-                routeKey = info.RouteKeyName;
+                exchange = info.Exchange;
+                queue = info.Queue;
+                routeKey = info.DefaultRouteKey;
             }
         }
 
-        private static void EnsureQueue<TMessage>(IModel channel, int delaySend, out string exchangeName, out string routeKey, out string queueName)
-            where TMessage : BaseMessage
-        {
-            var type = typeof(DelayTypeWapper<TMessage>);
-            if (!dict_info.ContainsKey(type))
-            {
-                var info = GetQueueInfo(type);
-                exchangeName = info.ExchangeName;
-                routeKey = info.RouteKeyName;
-                queueName = info.QueueName;
-                channel.ExchangeDeclare(exchangeName, ExchangeType.Direct);
-                channel.QueueDeclare(queueName, false, false, false);
-                channel.QueueBind(queueName, exchangeName, routeKey);
-
-                var args = new Dictionary<string, object>();
-                args.Add("x-message-ttl", delaySend);
-                args.Add("x-dead-letter-exchange", exchangeName);
-                args.Add("x-dead-letter-routing-key", queueName);
-                channel.QueueDeclare(info.QueueName + ".delay", false, false, false, args);
-                exchangeName = string.Empty;
-                routeKey = info.RouteKeyName + ".delay";
-                queueName = info.QueueName + ".delay";
-            }
-            else
-            {
-                var info = GetQueueInfo(type);
-                exchangeName = string.Empty;
-                routeKey = info.RouteKeyName + ".delay";
-                queueName = info.QueueName + ".delay";
-            }
-        }
-
-        private static void EnsureQueue<TMessage>(IModel channel, out string exchangeName, params string[] subscriberNames)
+        private static void EnsureQueue<TMessage>(IModel channel, string subscriberName, out string exchange, out string queue, params string[] subscribePatterns)
             where TMessage : BaseMessage
         {
             var type = typeof(TMessage);
             if (!dict_info.ContainsKey(type))
             {
                 var info = GetQueueInfo(type);
-                exchangeName = "topic." + info.ExchangeName;
-                channel.ExchangeDeclare(exchangeName, ExchangeType.Topic);
-                foreach (var subscriber in subscriberNames)
+                exchange = "topic." + info.Exchange;
+                queue = info.Queue + "." + subscriberName;
+                channel.ExchangeDeclare(exchange, ExchangeType.Topic, durable: true);
+                channel.QueueDeclare(queue, durable: true, exclusive: false, autoDelete: false);
+                foreach (var pattern in subscribePatterns)
                 {
-                    channel.QueueDeclare(subscriber + "." + info.QueueName, false, false, false);
-                    channel.QueueBind(subscriber + "." + info.QueueName, exchangeName, "topic." + subscriber);
+                    channel.QueueBind(queue, exchange, routingKey: pattern);
                 }
             }
             else
             {
                 var info = GetQueueInfo(type);
-                exchangeName = "topic." + info.ExchangeName;
+                exchange = "topic." + info.Exchange;
+                queue = info.Queue + "." + subscriberName;
             }
         }
 
-        private static void EnsureQueue<TMessage>(IModel channel, int delaySend, out string exchangeName, out string routeKey, params string[] subscriberNames)
+        private static void EnsureQueue<TMessage>(IModel channel, int delaySend, out string routeKey)
             where TMessage : BaseMessage
         {
             var type = typeof(DelayTypeWapper<TMessage>);
             if (!dict_info.ContainsKey(type))
             {
                 var info = GetQueueInfo(type);
-                exchangeName = "topic." + info.ExchangeName;
-                channel.ExchangeDeclare(exchangeName, ExchangeType.Topic);
-                foreach (var subscriber in subscriberNames)
-                {
-                    channel.QueueDeclare(subscriber + "." + info.QueueName, false, false, false);
-                    channel.QueueBind(subscriber + "." + info.QueueName, exchangeName, "topic." + subscriber);
-                }
+                channel.QueueDeclare(info.Queue, durable: true, exclusive: false, autoDelete: false);
 
-                #region inner_input
-                channel.ExchangeDeclare("inner_delay_exchange", ExchangeType.Direct);
-                channel.QueueDeclare("inner_delay_input", false, false, false);
-                channel.QueueBind("inner_delay_input", "inner_delay_exchange", "inner_delay_input");
-                var consumer = new EventingBasicConsumer(channel);
-                consumer.Received += (model, ea) =>
-                {
-                    var p = channel.CreateBasicProperties();
-                    p.ContentType = "text/plain";
-                    p.DeliveryMode = 2;
-                    foreach (var subscriber in subscriberNames)
-                    {
-                        channel.BasicPublish("topic." + info.ExchangeName, "topic." + subscriber, p, ea.Body);
-                    }
-                    channel.BasicAck(ea.DeliveryTag, false);
-                };
-                channel.BasicConsume("inner_delay_input", false, consumer);
-                #endregion
-
+                routeKey = info.Queue + ".delay";
                 var args = new Dictionary<string, object>();
                 args.Add("x-message-ttl", delaySend);
-                args.Add("x-dead-letter-exchange", "inner_delay_exchange");
-                args.Add("x-dead-letter-routing-key", "inner_delay_input");
-                channel.QueueDeclare(info.QueueName + ".delay", false, false, false, args);
-                exchangeName = string.Empty;
-                routeKey = info.QueueName + ".delay";
+                args.Add("x-dead-letter-exchange", string.Empty);
+                args.Add("x-dead-letter-routing-key", info.Queue);
+                channel.QueueDeclare(routeKey, durable: false, exclusive: false, autoDelete: false, arguments: args);
             }
             else
             {
                 var info = GetQueueInfo(type);
-                exchangeName = string.Empty;
-                routeKey = string.Empty; // 此种情况下不在意routeKey
+                routeKey = info.Queue + ".delay";
+            }
+        }
+
+        private static void EnsureQueue<TMessage>(IModel channel, out string exchange)
+            where TMessage : BaseMessage
+        {
+            var type = typeof(TMessage);
+            if (!dict_info.ContainsKey(type))
+            {
+                var info = GetQueueInfo(type);
+                exchange = "topic." + info.Exchange;
+                channel.ExchangeDeclare(exchange, ExchangeType.Topic, durable: true);
+            }
+            else
+            {
+                var info = GetQueueInfo(type);
+                exchange = "topic." + info.Exchange;
+            }
+        }
+
+        private static void EnsureQueue<TMessage>(IModel channel, int delaySend, string pattern, out string exchange)
+            where TMessage : BaseMessage
+        {
+            var type = typeof(DelayTypeWapper<TMessage>);
+            if (!dict_info.ContainsKey(type))
+            {
+                var info = GetQueueInfo(type);
+                exchange = info.Exchange + ".delay";
+
+                var args = new Dictionary<string, object>();
+                args.Add("x-message-ttl", delaySend);
+                args.Add("x-dead-letter-exchange", exchange);
+                args.Add("x-dead-letter-routing-key", pattern);
+                channel.QueueDeclare(info.Queue + ".delay", durable: true, exclusive: false, autoDelete: false, arguments: args);
+            }
+            else
+            {
+                var info = GetQueueInfo(type);
+                exchange = info.Exchange + ".delay";
             }
         }
 
@@ -513,9 +495,9 @@ namespace LightMessager.Helper
             var type_name = messageType.IsGenericType ? messageType.GenericTypeArguments[0].Name : messageType.Name;
             var info = dict_info.GetOrAdd(messageType, t => new QueueInfo
             {
-                ExchangeName = type_name + ".exchange",
-                RouteKeyName = type_name + ".input",
-                QueueName = type_name + ".input"
+                Exchange = type_name + ".exchange",
+                DefaultRouteKey = type_name + ".input",
+                Queue = type_name + ".input"
             });
 
             return info;
@@ -528,9 +510,9 @@ namespace LightMessager.Helper
 
         private class QueueInfo
         {
-            public string ExchangeName;
-            public string RouteKeyName;
-            public string QueueName;
+            public string Exchange;
+            public string DefaultRouteKey;
+            public string Queue;
         }
     }
 }
