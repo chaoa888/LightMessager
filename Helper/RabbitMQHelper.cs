@@ -20,6 +20,7 @@ namespace LightMessager.Helper
      * https://www.rabbitmq.com/dotnet-api-guide.html
      * https://www.rabbitmq.com/queues.html
      * https://www.rabbitmq.com/confirms.html
+     * https://stackoverflow.com/questions/4444208/delayed-message-in-rabbitmq
     */
     public sealed class RabbitMQHelper
     {
@@ -229,7 +230,8 @@ namespace LightMessager.Helper
             using (var pooled = InnerCreateChannel<TMessage>())
             {
                 IModel channel = pooled.Channel;
-                message.DeliveryTag = channel.NextPublishSeqNo;
+                pooled.PreRecord(message.KnuthHash);
+
                 var exchange = string.Empty;
                 var route_key = string.Empty;
                 var queue = string.Empty;
@@ -245,7 +247,6 @@ namespace LightMessager.Helper
                 var ret = channel.WaitForConfirms(TimeSpan.FromMilliseconds(time_out));
                 if (!ret)
                 {
-                    message.DeliveryTag = 0; // 重置为0
                     message.RetryCount = Math.Max(1, message.RetryCount);
                     message.RetryCount *= 2;
                     message.LastRetryTime = DateTime.Now;
@@ -286,7 +287,8 @@ namespace LightMessager.Helper
             using (var pooled = InnerCreateChannel<TMessage>())
             {
                 IModel channel = pooled.Channel;
-                message.DeliveryTag = channel.NextPublishSeqNo;
+                pooled.PreRecord(message.KnuthHash);
+
                 var exchange = string.Empty;
                 var route_key = string.Empty;
                 var queue = string.Empty;
