@@ -14,7 +14,6 @@ namespace LightMessager.Helper
             do
             {
                 tries++;
-
                 try
                 {
                     return retryme();
