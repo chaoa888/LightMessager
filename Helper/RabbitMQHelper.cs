@@ -134,7 +134,7 @@ namespace LightMessager.Helper
                     var exchange = string.Empty;
                     var route_key = string.Empty;
                     var queue = string.Empty;
-                    EnsureQueue<TMessage>(channel, out exchange, out route_key, out queue);
+                    EnsureQueue(channel, type, out exchange, out route_key, out queue);
                     channel.BasicConsume(queue, false, consumer);
                 }
             }
@@ -196,7 +196,7 @@ namespace LightMessager.Helper
 
                     var exchange = string.Empty;
                     var queue = string.Empty;
-                    EnsureQueue<TMessage>(channel, subscriberName, out exchange, out queue, subscribePatterns);
+                    EnsureQueue(channel, typeof(TMessage), subscriberName, out exchange, out queue, subscribePatterns);
                     channel.BasicConsume(queue, false, consumer);
                 }
             }
@@ -213,8 +213,7 @@ namespace LightMessager.Helper
         /// <param name="message">消息</param>
         /// <param name="delaySend">延迟多少毫秒发送消息</param>
         /// <returns>发送成功返回true，否则返回false</returns>
-        public static bool Send<TMessage>(TMessage message, int delaySend = 0)
-            where TMessage : BaseMessage
+        public static bool Send(BaseMessage message, int delaySend = 0)
         {
             if (string.IsNullOrWhiteSpace(message.Source))
             {
@@ -226,8 +225,9 @@ namespace LightMessager.Helper
                 return false;
             }
 
+            var messageType = message.GetType();
             delaySend = delaySend == 0 ? delaySend : Math.Max(delaySend, 1000); // 至少保证1秒的延迟，否则意义不大
-            using (var pooled = InnerCreateChannel<TMessage>())
+            using (var pooled = InnerCreateChannel(messageType))
             {
                 IModel channel = pooled.Channel;
                 pooled.PreRecord(message.MsgHash);
@@ -235,7 +235,7 @@ namespace LightMessager.Helper
                 var exchange = string.Empty;
                 var route_key = string.Empty;
                 var queue = string.Empty;
-                EnsureQueue<TMessage>(channel, out exchange, out route_key, out queue, delaySend);
+                EnsureQueue(channel, messageType, out exchange, out route_key, out queue, delaySend);
 
                 var json = Jil.JSON.SerializeDynamic(message, Jil.Options.IncludeInherited);
                 var bytes = Encoding.UTF8.GetBytes(json);
@@ -283,8 +283,9 @@ namespace LightMessager.Helper
                 return false;
             }
 
+            var messageType = message.GetType();
             delaySend = delaySend == 0 ? delaySend : Math.Max(delaySend, 1000); // 至少保证1秒的延迟，否则意义不大
-            using (var pooled = InnerCreateChannel<TMessage>())
+            using (var pooled = InnerCreateChannel(messageType))
             {
                 IModel channel = pooled.Channel;
                 pooled.PreRecord(message.MsgHash);
@@ -292,7 +293,7 @@ namespace LightMessager.Helper
                 var exchange = string.Empty;
                 var route_key = string.Empty;
                 var queue = string.Empty;
-                EnsureQueue<TMessage>(channel, out exchange, out route_key, out queue, pattern, delaySend);
+                EnsureQueue(channel, messageType, out exchange, out route_key, out queue, pattern, delaySend);
 
                 var json = Jil.JSON.SerializeDynamic(message, Jil.Options.IncludeInherited);
                 var bytes = Encoding.UTF8.GetBytes(json);
@@ -314,17 +315,15 @@ namespace LightMessager.Helper
             return true;
         }
 
-        private static PooledChannel InnerCreateChannel<TMessage>()
-            where TMessage : BaseMessage
+        private static PooledChannel InnerCreateChannel(Type messageType)
         {
             var pool = pools.GetOrAdd(
-                typeof(TMessage),
+                messageType,
                 t => new ObjectPool<IPooledWapper>(p => new PooledChannel(connection.CreateModel(), p), 10));
             return pool.Get() as PooledChannel;
         }
 
-        private static bool PrePersistMessage<TMessage>(TMessage message)
-            where TMessage : BaseMessage
+        private static bool PrePersistMessage(BaseMessage message)
         {
             if (message.RetryCount == 0)
             {
@@ -372,10 +371,9 @@ namespace LightMessager.Helper
             }
         }
 
-        private static void EnsureQueue<TMessage>(IModel channel, out string exchange, out string routeKey, out string queue, int delaySend = 0)
-            where TMessage : BaseMessage
+        private static void EnsureQueue(IModel channel, Type messageType, out string exchange, out string routeKey, out string queue, int delaySend = 0)
         {
-            var type = typeof(TMessage);
+            var type = messageType;
             if (!dict_info.ContainsKey(type))
             {
                 var info = GetQueueInfo(type);
@@ -414,13 +412,12 @@ namespace LightMessager.Helper
             }
         }
 
-        private static void EnsureQueue<TMessage>(IModel channel, string subscriberName, out string exchange, out string queue, params string[] subscribePatterns)
-            where TMessage : BaseMessage
+        private static void EnsureQueue(IModel channel, Type messageType, string subscriberName, out string exchange, out string queue, params string[] subscribePatterns)
         {
-            var key = (typeof(TMessage), subscriberName);
+            var key = (messageType, subscriberName);
             if (!dict_info_name.ContainsKey(key))
             {
-                var info = GetQueueInfo(typeof(TMessage), subscriberName);
+                var info = GetQueueInfo(messageType, subscriberName);
                 exchange = "topic." + info.Exchange;
                 queue = info.Queue + "." + subscriberName;
                 channel.ExchangeDeclare(exchange, ExchangeType.Topic, durable: true);
@@ -432,16 +429,15 @@ namespace LightMessager.Helper
             }
             else
             {
-                var info = GetQueueInfo(typeof(TMessage), subscriberName);
+                var info = GetQueueInfo(messageType, subscriberName);
                 exchange = "topic." + info.Exchange;
                 queue = info.Queue + "." + subscriberName;
             }
         }
 
-        private static void EnsureQueue<TMessage>(IModel channel, out string exchange, out string routeKey, out string queue, string pattern, int delaySend = 0)
-            where TMessage : BaseMessage
+        private static void EnsureQueue(IModel channel, Type messageType, out string exchange, out string routeKey, out string queue, string pattern, int delaySend = 0)
         {
-            var type = typeof(TMessage);
+            var type = messageType;
             if (!dict_info.ContainsKey(type))
             {
                 var info = GetQueueInfo(type);
