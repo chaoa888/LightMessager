@@ -5,7 +5,7 @@ namespace LightMessager.Message
 {
     public class BaseMessage
     {
-        public long MsgHash { set; get; }
+        internal long MsgHash { set; get; }
 
         [JilDirective(Ignore = true)]
         public string Source { set; get; }
