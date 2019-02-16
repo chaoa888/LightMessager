@@ -10,14 +10,14 @@ namespace LightMessager.Pool
     {
         private IModel _internalChannel;
         private ObjectPool<IPooledWapper> _pool;
-        private Dictionary<ulong, ulong> _unconfirm;
+        private Dictionary<ulong, long> _unconfirm;
         public DateTime LastGetTime { set; get; }
         public IModel Channel { get { return this._internalChannel; } }
 
         public PooledChannel(IModel channel, ObjectPool<IPooledWapper> pool)
         {
             _pool = pool;
-            _unconfirm = new Dictionary<ulong, ulong>();
+            _unconfirm = new Dictionary<ulong, long>();
             _internalChannel = channel;
             _internalChannel.ConfirmSelect();
             // 此处不考虑BasicReturn的情况，因为消息发送并没有指定mandatory属性
@@ -26,9 +26,9 @@ namespace LightMessager.Pool
             _internalChannel.ModelShutdown += Channel_ModelShutdown;
         }
 
-        internal void PreRecord(ulong msgKnuthHash)
+        internal void PreRecord(long msgHash)
         {
-            _unconfirm.Add(_internalChannel.NextPublishSeqNo, msgKnuthHash);
+            _unconfirm.Add(_internalChannel.NextPublishSeqNo, msgHash);
         }
 
         private void Channel_BasicNacks(object sender, BasicNackEventArgs e)
@@ -39,12 +39,12 @@ namespace LightMessager.Pool
         private void Channel_BasicAcks(object sender, BasicAckEventArgs e)
         {
             // 数据更新该条消息的状态信息
-            ulong knuthHash = 0;
-            if (_unconfirm.TryGetValue(e.DeliveryTag, out knuthHash))
+            long msgHash = 0;
+            if (_unconfirm.TryGetValue(e.DeliveryTag, out msgHash))
             {
                 MessageQueueHelper.Update(new MessageQueue
                 {
-                    KnuthHash = knuthHash,
+                    MsgHash = msgHash,
                     CanBeRemoved = true
                 });
                 _unconfirm.Remove(e.DeliveryTag);

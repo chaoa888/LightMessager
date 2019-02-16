@@ -9,7 +9,7 @@ namespace LightMessager.DAL
 {
     internal partial class MessageQueueHelper : BaseTableHelper
     {
-        private static List<string> _all_fields = new List<string> { "KnuthHash", "MsgContent", "Status", "RetryCount", "LastRetryTime", "CanBeRemoved" };
+        private static List<string> _all_fields = new List<string> { "MsgHash", "MsgContent", "Status", "RetryCount", "LastRetryTime", "CanBeRemoved", };
 
         /// <summary>
         /// 是否存在指定的MessageQueue实体对象
@@ -38,9 +38,9 @@ namespace LightMessager.DAL
         public static int Insert(MessageQueue model, SqlConnection conn = null, SqlTransaction transaction = null)
         {
             var sql = new StringBuilder();
-            sql.Append("INSERT INTO [MessageQueue]([KnuthHash], [MsgContent], [Status], [RetryCount], [LastRetryTime], [CanBeRemoved], [CreatedTime])");
+            sql.Append("INSERT INTO [MessageQueue]([MsgHash], [MsgContent], [Status], [RetryCount], [LastRetryTime], [CanBeRemoved], [CreatedTime])");
             sql.Append(" OUTPUT INSERTED.[Id] ");
-            sql.Append("VALUES(@KnuthHash, @MsgContent, @Status, @RetryCount, @LastRetryTime, @CanBeRemoved, @CreatedTime)");
+            sql.Append("VALUES(@MsgHash, @MsgContent, @Status, @RetryCount, @LastRetryTime, @CanBeRemoved, @CreatedTime)");
             var ret = 0;
             if (conn != null)
             {
@@ -83,7 +83,7 @@ namespace LightMessager.DAL
         /// <summary>
         /// 批量删除指定的MessageQueue实体对象
         /// </summary>
-        /// <param name="ids">id列表</param>
+        /// <param name="ids">id列表 id列表</param>
         /// <returns>是否成功，true为成功</returns>
         public static bool Delete(List<int> ids)
         {
@@ -111,7 +111,7 @@ namespace LightMessager.DAL
             sql.Append("UPDATE [MessageQueue]");
             if (fields == null || fields.Count == 0)
             {
-                sql.Append(" SET [KnuthHash]=@KnuthHash, [MsgContent]=@MsgContent, [Status]=@Status, [RetryCount]=@RetryCount, [LastRetryTime]=@LastRetryTime, [CanBeRemoved]=@CanBeRemoved");
+                sql.Append(" SET [MsgHash]=@MsgHash, [MsgContent]=@MsgContent, [Status]=@Status, [RetryCount]=@RetryCount, [LastRetryTime]=@LastRetryTime, [CanBeRemoved]=@CanBeRemoved");
             }
             else
             {
@@ -153,12 +153,12 @@ namespace LightMessager.DAL
         /// <summary>
         /// 获取指定的MessageQueue实体对象
         /// </summary>
-        /// <param name="id">id</param>
+        /// <param name="Id">Id</param>
         /// <returns>MessageQueue实体对象</returns>
-        public static MessageQueue GetModel(int id)
+        public static MessageQueue GetModel(int Id)
         {
             var sql = new StringBuilder();
-            sql.Append("SELECT TOP 1 [Id], [KnuthHash], [MsgContent], [Status], [RetryCount], [LastRetryTime], [CanBeRemoved], [CreatedTime] FROM [MessageQueue] ");
+            sql.Append("SELECT TOP 1 [Id], [MsgHash], [MsgContent], [Status], [RetryCount], [LastRetryTime], [CanBeRemoved], [CreatedTime] FROM [MessageQueue] ");
             sql.Append(" WHERE [Id]=@Id ");
             MessageQueue ret = null;
             using (var conn = GetOpenConnection())
@@ -174,15 +174,15 @@ namespace LightMessager.DAL
         /// </summary>
         /// <param name="Id">Id</param>
         /// <returns>MessageQueue实体对象</returns>
-        public static MessageQueue GetModelBy(ulong knuthHash)
+        public static MessageQueue GetModelBy(long msgHash)
         {
             var sql = new StringBuilder();
-            sql.Append("SELECT TOP 1 Id, KnuthHash, MsgContent, CanBeRemoved, RetryCount, LastRetryTime, CreatedTime FROM MessageQueue ");
-            sql.Append(" WHERE KnuthHash=@KnuthHash");
+            sql.Append("SELECT TOP 1 Id, MsgHash, MsgContent, CanBeRemoved, RetryCount, LastRetryTime, CreatedTime FROM MessageQueue ");
+            sql.Append(" WHERE MsgHash=@MsgHash");
             MessageQueue ret = null;
             using (var conn = GetOpenConnection())
             {
-                ret = conn.QueryFirstOrDefault<MessageQueue>(sql.ToString(), new { @KnuthHash = knuthHash });
+                ret = conn.QueryFirstOrDefault<MessageQueue>(sql.ToString(), new { @MsgHash = msgHash });
             }
 
             return ret;
@@ -199,7 +199,7 @@ namespace LightMessager.DAL
             var sql = new StringBuilder();
             sql.Append("SELECT ");
             sql.Append(" TOP " + top.ToString());
-            sql.Append(" [Id], [KnuthHash], [MsgContent], [Status], [RetryCount], [LastRetryTime], [CanBeRemoved], [CreatedTime] ");
+            sql.Append(" [Id], [MsgHash], [MsgContent], [Status], [RetryCount], [LastRetryTime], [CanBeRemoved], [CreatedTime] ");
             sql.Append(" FROM [MessageQueue] ");
             if (!string.IsNullOrWhiteSpace(where))
             {

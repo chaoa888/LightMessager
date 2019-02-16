@@ -28,7 +28,7 @@ namespace LightMessager.Helper
         static IConnection connection;
         static volatile int prepersist_count;
         static readonly int default_retry_wait;
-        static List<ulong> prepersist;
+        static List<long> prepersist;
         static ConcurrentQueue<BaseMessage> retry_queue;
         static ConcurrentDictionary<Type, QueueInfo> dict_info;
         static ConcurrentDictionary<Type, object> dict_func;
@@ -60,7 +60,7 @@ namespace LightMessager.Helper
             prefetch_count = 100;
             prepersist_count = 0;
             default_retry_wait = 1000; // 1秒
-            prepersist = new List<ulong>();
+            prepersist = new List<long>();
             retry_queue = new ConcurrentQueue<BaseMessage>();
             dict_info = new ConcurrentDictionary<Type, QueueInfo>();
             dict_func = new ConcurrentDictionary<Type, object>();
@@ -230,7 +230,7 @@ namespace LightMessager.Helper
             using (var pooled = InnerCreateChannel<TMessage>())
             {
                 IModel channel = pooled.Channel;
-                pooled.PreRecord(message.KnuthHash);
+                pooled.PreRecord(message.MsgHash);
 
                 var exchange = string.Empty;
                 var route_key = string.Empty;
@@ -287,7 +287,7 @@ namespace LightMessager.Helper
             using (var pooled = InnerCreateChannel<TMessage>())
             {
                 IModel channel = pooled.Channel;
-                pooled.PreRecord(message.KnuthHash);
+                pooled.PreRecord(message.MsgHash);
 
                 var exchange = string.Empty;
                 var route_key = string.Empty;
@@ -328,24 +328,24 @@ namespace LightMessager.Helper
         {
             if (message.RetryCount == 0)
             {
-                var knuthHash = MessageIdHelper.GenerateMessageIdFrom(Encoding.UTF8.GetBytes(message.Source));
-                if (prepersist.Contains(knuthHash))
+                var msgHash = MessageIdHelper.GenerateMessageIdFrom(message.Source);
+                if (prepersist.Contains(msgHash))
                 {
                     return false;
                 }
                 else
                 {
-                    message.KnuthHash = knuthHash;
+                    message.MsgHash = msgHash;
                     if (Interlocked.Increment(ref prepersist_count) != 1000)
                     {
-                        prepersist.Add(knuthHash);
+                        prepersist.Add(msgHash);
                     }
                     else
                     {
                         prepersist.RemoveRange(0, 950);
                     }
 
-                    var model = MessageQueueHelper.GetModelBy(knuthHash);
+                    var model = MessageQueueHelper.GetModelBy(msgHash);
                     if (model != null)
                     {
                         return false;
@@ -354,7 +354,7 @@ namespace LightMessager.Helper
                     {
                         var new_model = new MessageQueue
                         {
-                            KnuthHash = knuthHash,
+                            MsgHash = msgHash,
                             MsgContent = message.Source,
                             RetryCount = 0,
                             CanBeRemoved = false,

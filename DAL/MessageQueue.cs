@@ -2,16 +2,16 @@ using System;
 
 namespace LightMessager.DAL
 {
-	/// <summary>
-	/// LightMessager专用消息落地表实体
-	/// </summary>
-	[Serializable]
-	internal class MessageQueue
+    /// <summary>
+    /// LightMessager专用消息落地表实体
+    /// </summary>
+    [Serializable]
+    internal class MessageQueue
 	{
 		public MessageQueue()
 		{}
 		private int _id;
-		private ulong _knuthhash;
+		private long _msghash;
 		private string _msgcontent;
 		private short _status;
 		private short _retrycount;
@@ -29,12 +29,12 @@ namespace LightMessager.DAL
 		}
 
 		/// <summary>
-		/// KnuthHash
+		/// MsgHash
 		/// </summary>
-		public ulong KnuthHash
+		public long MsgHash
 		{
-			set { _knuthhash = value; }
-			get { return _knuthhash; }
+			set { _msghash = value; }
+			get { return _msghash; }
 		}
 
 		/// <summary>
