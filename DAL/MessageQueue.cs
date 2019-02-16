@@ -6,16 +6,17 @@ namespace LightMessager.DAL
 	/// LightMessager专用消息落地表实体
 	/// </summary>
 	[Serializable]
-	public class MessageQueue
+	internal class MessageQueue
 	{
 		public MessageQueue()
 		{}
 		private int _id;
 		private ulong _knuthhash;
 		private string _msgcontent;
-		private bool _canberemoved;
+		private short _status;
 		private short _retrycount;
-		private DateTime? _lastretrytime;
+		private DateTime _lastretrytime;
+		private bool _canberemoved;
 		private DateTime _createdtime;
 
 		/// <summary>
@@ -37,7 +38,7 @@ namespace LightMessager.DAL
 		}
 
 		/// <summary>
-		/// MsgContent
+		/// 消息内容
 		/// </summary>
 		public string MsgContent
 		{
@@ -46,16 +47,16 @@ namespace LightMessager.DAL
 		}
 
 		/// <summary>
-		/// CanBeRemoved
+		/// 状态[1 Created 2 Retrying 3 ArrivedBroker 4 ArrivedConsumer 5 Exception 6 Processed]
 		/// </summary>
-		public bool CanBeRemoved
+		public short Status
 		{
-			set { _canberemoved = value; }
-			get { return _canberemoved; }
+			set { _status = value; }
+			get { return _status; }
 		}
 
 		/// <summary>
-		/// ExecuteCount
+		/// 重试次数
 		/// </summary>
 		public short RetryCount
 		{
@@ -64,16 +65,25 @@ namespace LightMessager.DAL
 		}
 
 		/// <summary>
-		/// LastExecuteTime
+		/// 最近重试时间
 		/// </summary>
-		public DateTime? LastRetryTime
+		public DateTime LastRetryTime
 		{
 			set { _lastretrytime = value; }
 			get { return _lastretrytime; }
 		}
 
 		/// <summary>
-		/// CreatedTime
+		/// 能否被删除
+		/// </summary>
+		public bool CanBeRemoved
+		{
+			set { _canberemoved = value; }
+			get { return _canberemoved; }
+		}
+
+		/// <summary>
+		/// 创建时间
 		/// </summary>
 		public DateTime CreatedTime
 		{
