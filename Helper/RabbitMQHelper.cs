@@ -29,7 +29,8 @@ namespace LightMessager.Helper
         static volatile int prepersist_count;
         static readonly int default_retry_wait;
         static List<long> prepersist;
-        static ConcurrentQueue<BaseMessage> retry_queue;
+        static ConcurrentQueue<BaseMessage> retry_send_queue;
+        static ConcurrentQueue<BaseMessage> retry_pub_queue;
         static ConcurrentDictionary<Type, QueueInfo> dict_info;
         static ConcurrentDictionary<Type, object> dict_func;
         static ConcurrentDictionary<(Type, string), QueueInfo> dict_info_name; // with name
@@ -61,7 +62,8 @@ namespace LightMessager.Helper
             prepersist_count = 0;
             default_retry_wait = 1000; // 1秒
             prepersist = new List<long>();
-            retry_queue = new ConcurrentQueue<BaseMessage>();
+            retry_send_queue = new ConcurrentQueue<BaseMessage>();
+            retry_pub_queue = new ConcurrentQueue<BaseMessage>();
             dict_info = new ConcurrentDictionary<Type, QueueInfo>();
             dict_func = new ConcurrentDictionary<Type, object>();
             dict_info_name = new ConcurrentDictionary<(Type, string), QueueInfo>();
@@ -83,10 +85,16 @@ namespace LightMessager.Helper
                 // 先实现为spin的方式，后面考虑换成blockingqueue的方式
                 while (true)
                 {
-                    BaseMessage item;
-                    while (retry_queue.TryDequeue(out item))
+                    BaseMessage send_item;
+                    while (retry_send_queue.TryDequeue(out send_item))
                     {
-                        Send(item);
+                        Send(send_item);
+                    }
+
+                    BaseMessage pub_item;
+                    while (retry_send_queue.TryDequeue(out pub_item))
+                    {
+                        Publish(pub_item, pub_item.Pattern);
                     }
                     Thread.Sleep(1000 * 5);
                 }
@@ -259,7 +267,7 @@ namespace LightMessager.Helper
                         LastRetryTime = DateTime.Now
                     });
 
-                    retry_queue.Enqueue(message);
+                    retry_send_queue.Enqueue(message);
                 }
             }
 
@@ -325,7 +333,8 @@ namespace LightMessager.Helper
                         LastRetryTime = DateTime.Now
                     });
 
-                    retry_queue.Enqueue(message);
+                    message.Pattern = pattern;
+                    retry_pub_queue.Enqueue(message);
                 }
             }
 

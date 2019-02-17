@@ -33,7 +33,7 @@ namespace LightMessager.Pool
 
         private void Channel_BasicNacks(object sender, BasicNackEventArgs e)
         {
-            // 日志记录
+            // TODO
         }
 
         private void Channel_BasicAcks(object sender, BasicAckEventArgs e)
