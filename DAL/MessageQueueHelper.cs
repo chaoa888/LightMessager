@@ -9,7 +9,7 @@ namespace LightMessager.DAL
 {
     internal partial class MessageQueueHelper : BaseTableHelper
     {
-        private static List<string> _all_fields = new List<string> { "MsgHash", "MsgContent", "Status", "RetryCount", "LastRetryTime", "CanBeRemoved", };
+        private static List<string> _all_fields = new List<string> { "Status", "RetryCount", "LastRetryTime", "CanBeRemoved" };
 
         /// <summary>
         /// 是否存在指定的MessageQueue实体对象
@@ -35,27 +35,16 @@ namespace LightMessager.DAL
         /// </summary>
         /// <param name="model">MessageQueue实体</param>
         /// <returns>新插入数据的id</returns>
-        public static int Insert(MessageQueue model, SqlConnection conn = null, SqlTransaction transaction = null)
+        public static int Insert(MessageQueue model)
         {
             var sql = new StringBuilder();
             sql.Append("INSERT INTO [MessageQueue]([MsgHash], [MsgContent], [Status], [RetryCount], [LastRetryTime], [CanBeRemoved], [CreatedTime])");
             sql.Append(" OUTPUT INSERTED.[Id] ");
             sql.Append("VALUES(@MsgHash, @MsgContent, @Status, @RetryCount, @LastRetryTime, @CanBeRemoved, @CreatedTime)");
             var ret = 0;
-            if (conn != null)
+            using (var conn = GetOpenConnection())
             {
-                if (transaction == null)
-                {
-                    throw new ArgumentNullException("transaction");
-                }
-                ret = conn.ExecuteScalar<int>(sql.ToString(), model, transaction);
-            }
-            else
-            {
-                using (var conn1 = GetOpenConnection())
-                {
-                    ret = conn1.ExecuteScalar<int>(sql.ToString(), model);
-                }
+                ret = conn.ExecuteScalar<int>(sql.ToString(), model);
             }
 
             return ret;
@@ -105,13 +94,13 @@ namespace LightMessager.DAL
         /// <param name="model">MessageQueue实体</param>
         /// <param name="fields">需要更新的字段名字</param>
         /// <returns>是否成功，true为成功</returns>
-        public static bool Update(MessageQueue model, IList<string> fields = null, bool reverse = false, SqlConnection conn = null, SqlTransaction transaction = null)
+        public static bool Update(MessageQueue model, IList<string> fields = null, bool reverse = false)
         {
             var sql = new StringBuilder();
             sql.Append("UPDATE [MessageQueue]");
             if (fields == null || fields.Count == 0)
             {
-                sql.Append(" SET [MsgHash]=@MsgHash, [MsgContent]=@MsgContent, [Status]=@Status, [RetryCount]=@RetryCount, [LastRetryTime]=@LastRetryTime, [CanBeRemoved]=@CanBeRemoved");
+                sql.Append(" SET [Status]=@Status, [RetryCount]=@RetryCount, [LastRetryTime]=@LastRetryTime, [CanBeRemoved]=@CanBeRemoved");
             }
             else
             {
@@ -129,22 +118,11 @@ namespace LightMessager.DAL
                     }
                 }
             }
-            sql.Append(" WHERE [Id]=@Id");
+            sql.Append(" WHERE [MsgHash]=@MsgHash");
             var ret = false;
-            if (conn != null)
+            using (var conn = GetOpenConnection())
             {
-                if (transaction == null)
-                {
-                    throw new ArgumentNullException("transaction");
-                }
-                ret = conn.Execute(sql.ToString(), model, transaction) > 0;
-            }
-            else
-            {
-                using (var conn1 = GetOpenConnection())
-                {
-                    ret = conn1.Execute(sql.ToString(), model) > 0;
-                }
+                ret = conn.Execute(sql.ToString(), model) > 0;
             }
 
             return ret;
