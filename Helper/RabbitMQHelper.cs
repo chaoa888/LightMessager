@@ -265,7 +265,7 @@ namespace LightMessager.Helper
                         Status = 2, // Retrying
                         RetryCount = message.RetryCount,
                         LastRetryTime = DateTime.Now
-                    });
+                    }, oldStatus: 1);
 
                     retry_send_queue.Enqueue(message);
                 }
@@ -331,7 +331,7 @@ namespace LightMessager.Helper
                         Status = 2, // Retrying
                         RetryCount = message.RetryCount,
                         LastRetryTime = DateTime.Now
-                    });
+                    }, oldStatus: 1);
 
                     message.Pattern = pattern;
                     retry_pub_queue.Enqueue(message);

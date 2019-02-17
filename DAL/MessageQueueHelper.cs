@@ -1,16 +1,13 @@
+using Dapper;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using Dapper;
-using System.Data.SqlClient;
 
 namespace LightMessager.DAL
 {
     internal partial class MessageQueueHelper : BaseTableHelper
     {
-        private static List<string> _all_fields = new List<string> { "Status", "RetryCount", "LastRetryTime", "CanBeRemoved" };
-
         /// <summary>
         /// 是否存在指定的MessageQueue实体对象
         /// </summary>
@@ -94,31 +91,29 @@ namespace LightMessager.DAL
         /// <param name="model">MessageQueue实体</param>
         /// <param name="fields">需要更新的字段名字</param>
         /// <returns>是否成功，true为成功</returns>
-        public static bool Update(MessageQueue model, IList<string> fields = null, bool reverse = false)
+        public static bool Update(MessageQueue model, params int[] oldStatus)
         {
             var sql = new StringBuilder();
-            sql.Append("UPDATE [MessageQueue]");
-            if (fields == null || fields.Count == 0)
+            sql.AppendLine("DECLARE @retVal int ");
+            sql.AppendLine("UPDATE [MessageQueue] ");
+            sql.AppendLine("SET [Status]=@Status, [RetryCount]=@RetryCount, [LastRetryTime]=@LastRetryTime, [CanBeRemoved]=@CanBeRemoved ");
+            sql.AppendLine("WHERE [MsgHash]=@MsgHash and ");
+            if (oldStatus.Length == 1)
             {
-                sql.Append(" SET [Status]=@Status, [RetryCount]=@RetryCount, [LastRetryTime]=@LastRetryTime, [CanBeRemoved]=@CanBeRemoved");
+                sql.Append("[Status]=" + oldStatus[0]);
             }
             else
             {
-                if (reverse == true)
+                for (int i = 0; i < oldStatus.Length; i++)
                 {
-                    fields = _all_fields.Except(fields).ToList();
-                }
-                sql.Append(" SET ");
-                for (int i = 0; i < fields.Count; i++)
-                {
-                    sql.Append("[" + fields[i] + "]=@" + fields[i] + "");
-                    if (i != fields.Count - 1)
-                    {
-                        sql.Append(",");
-                    }
+                    sql.Append("[Status]=" + oldStatus[i] + " or ");
                 }
             }
-            sql.Append(" WHERE [MsgHash]=@MsgHash");
+            sql.AppendLine("SELECT @retVal = @@Rowcount ");
+            sql.AppendLine("IF (@retVal = 0) ");
+            sql.AppendLine("BEGIN ");
+            sql.AppendLine("UPDATE [MessageQueue] set [Status]=5 WHERE [MsgHash]=@MsgHash "); // Exception
+            sql.AppendLine("END ");
             var ret = false;
             using (var conn = GetOpenConnection())
             {
