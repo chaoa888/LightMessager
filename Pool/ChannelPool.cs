@@ -40,15 +40,15 @@ namespace LightMessager.Pool
         {
             // 数据更新该条消息的状态信息
             long msgHash = 0;
-            //if (_unconfirm.TryGetValue(e.DeliveryTag, out msgHash))
-            //{
-            //    MessageQueueHelper.Update(new MessageQueue
-            //    {
-            //        MsgHash = msgHash,
-            //        CanBeRemoved = true
-            //    });
-            //    _unconfirm.Remove(e.DeliveryTag);
-            //}
+            if (_unconfirm.TryGetValue(e.DeliveryTag, out msgHash))
+            {
+                MessageQueueHelper.Update(new MessageQueue
+                {
+                    MsgHash = msgHash,
+                    Status = 3 // ArrivedBroker
+                });
+                _unconfirm.Remove(e.DeliveryTag);
+            }
         }
 
         private void Channel_ModelShutdown(object sender, ShutdownEventArgs e)

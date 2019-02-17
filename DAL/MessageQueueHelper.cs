@@ -155,8 +155,8 @@ namespace LightMessager.DAL
         public static MessageQueue GetModelBy(long msgHash)
         {
             var sql = new StringBuilder();
-            sql.Append("SELECT TOP 1 Id, MsgHash, MsgContent, CanBeRemoved, RetryCount, LastRetryTime, CreatedTime FROM MessageQueue ");
-            sql.Append(" WHERE MsgHash=@MsgHash");
+            sql.Append("SELECT TOP 1 [Id], [MsgHash], [MsgContent], [CanBeRemoved], [RetryCount], [LastRetryTime], [CreatedTime] FROM [MessageQueue] ");
+            sql.Append(" WHERE [MsgHash]=@MsgHash");
             MessageQueue ret = null;
             using (var conn = GetOpenConnection())
             {

@@ -9,7 +9,7 @@ CREATE TABLE [dbo].[MessageQueue](
 	[MsgHash] [bigint] NOT NULL,
 	[MsgContent] [nvarchar](500) NOT NULL,
 	[Status] [smallint] NOT NULL,
-	[RetryCount] [smallint] NOT NULL,
+	[RetryCount] [int] NOT NULL,
 	[LastRetryTime] [datetime] NOT NULL,
 	[CanBeRemoved] [bit] NOT NULL,
 	[CreatedTime] [datetime] NOT NULL,

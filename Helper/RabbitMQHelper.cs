@@ -243,13 +243,22 @@ namespace LightMessager.Helper
                 props.ContentType = "text/plain";
                 props.DeliveryMode = 2;
                 channel.BasicPublish(exchange, route_key, props, bytes);
-                var time_out = Math.Max(default_retry_wait, message.RetryCount * 1000);
+                var time_out = Math.Max(default_retry_wait, message.RetryCount * 2 /*2倍往上扩大，防止出现均等*/ * 1000);
                 var ret = channel.WaitForConfirms(TimeSpan.FromMilliseconds(time_out));
                 if (!ret)
                 {
                     message.RetryCount = Math.Max(1, message.RetryCount);
-                    message.RetryCount *= 2;
+                    message.RetryCount += 1;
                     message.LastRetryTime = DateTime.Now;
+                    // 数据库更新该条消息的状态信息
+                    MessageQueueHelper.Update(new MessageQueue
+                    {
+                        MsgHash = message.MsgHash,
+                        Status = 2, // Retrying
+                        RetryCount = message.RetryCount,
+                        LastRetryTime = DateTime.Now
+                    });
+
                     retry_queue.Enqueue(message);
                 }
             }
@@ -265,8 +274,7 @@ namespace LightMessager.Helper
         /// <param name="pattern">消息满足的模式（也就是routeKey）</param>
         /// <param name="delaySend">延迟多少毫秒发布消息</param>
         /// <returns>发布成功返回true，否则返回false</returns>
-        public static bool Publish<TMessage>(TMessage message, string pattern, int delaySend = 0)
-            where TMessage : BaseMessage
+        public static bool Publish(BaseMessage message, string pattern, int delaySend = 0)
         {
             if (string.IsNullOrWhiteSpace(message.Source))
             {
@@ -300,15 +308,24 @@ namespace LightMessager.Helper
                 var props = channel.CreateBasicProperties();
                 props.ContentType = "text/plain";
                 props.DeliveryMode = 2;
-                if (delaySend > 0)
+                channel.BasicPublish(exchange, pattern, props, bytes);
+                var time_out = Math.Max(default_retry_wait, message.RetryCount * 2 /*2倍往上扩大，防止出现均等*/ * 1000);
+                var ret = channel.WaitForConfirms(TimeSpan.FromMilliseconds(time_out));
+                if (!ret)
                 {
-                    channel.BasicPublish(exchange, pattern, props, bytes);
-                    channel.WaitForConfirms();
-                }
-                else
-                {
-                    channel.BasicPublish(exchange, pattern, props, bytes);
-                    channel.WaitForConfirms();
+                    message.RetryCount = Math.Max(1, message.RetryCount);
+                    message.RetryCount += 1;
+                    message.LastRetryTime = DateTime.Now;
+                    // 数据库更新该条消息的状态信息
+                    MessageQueueHelper.Update(new MessageQueue
+                    {
+                        MsgHash = message.MsgHash,
+                        Status = 2, // Retrying
+                        RetryCount = message.RetryCount,
+                        LastRetryTime = DateTime.Now
+                    });
+
+                    retry_queue.Enqueue(message);
                 }
             }
 
