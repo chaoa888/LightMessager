@@ -19,7 +19,6 @@ namespace LightMessager.Message
             var sleep = 0;
             try
             {
-
                 await DoHandle(message);
             }
             catch (Exception<LightMessagerExceptionArgs> ex)

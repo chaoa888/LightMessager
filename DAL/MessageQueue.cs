@@ -15,7 +15,7 @@ namespace LightMessager.DAL
 		private string _msgcontent;
 		private short _status;
 		private int _retrycount;
-		private DateTime _lastretrytime;
+		private DateTime? _lastretrytime;
 		private bool _canberemoved;
 		private DateTime _createdtime;
 
@@ -67,7 +67,7 @@ namespace LightMessager.DAL
 		/// <summary>
 		/// 最近重试时间
 		/// </summary>
-		public DateTime LastRetryTime
+		public DateTime? LastRetryTime
 		{
 			set { _lastretrytime = value; }
 			get { return _lastretrytime; }

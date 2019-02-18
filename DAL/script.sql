@@ -10,7 +10,7 @@ CREATE TABLE [dbo].[MessageQueue](
 	[MsgContent] [nvarchar](500) NOT NULL,
 	[Status] [smallint] NOT NULL,
 	[RetryCount] [int] NOT NULL,
-	[LastRetryTime] [datetime] NOT NULL,
+	[LastRetryTime] [datetime] NULL,
 	[CanBeRemoved] [bit] NOT NULL,
 	[CreatedTime] [datetime] NOT NULL,
  CONSTRAINT [PK_Id] PRIMARY KEY NONCLUSTERED 

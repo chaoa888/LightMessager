@@ -48,11 +48,11 @@ namespace LightMessager.Helper
             #region 读取配置
             // 添加json配置文件路径
 #if LOCAL
-            var builder = new ConfigurationBuilder().SetBasePath(Directory.GetCurrentDirectory()).AddJsonFile("appsettings.Local.json");
+            var builder = new ConfigurationBuilder().SetBasePath(AppDomain.CurrentDomain.BaseDirectory).AddJsonFile("appsettings.Local.json");
 #elif DEBUG
-            var builder = new ConfigurationBuilder().SetBasePath(Directory.GetCurrentDirectory()).AddJsonFile("appsettings.Development.json");
+            var builder = new ConfigurationBuilder().SetBasePath(AppDomain.CurrentDomain.BaseDirectory).AddJsonFile("appsettings.Development.json");
 #else
-            var builder = new ConfigurationBuilder().SetBasePath(Directory.GetCurrentDirectory()).AddJsonFile("appsettings.json");
+            var builder = new ConfigurationBuilder().SetBasePath(AppDomain.CurrentDomain.BaseDirectory).AddJsonFile("appsettings.json");
 #endif
             // 创建配置根对象
             var configurationRoot = builder.Build();
@@ -126,7 +126,7 @@ namespace LightMessager.Helper
                     channel.BasicQos(0, prefetch_count, false);
                     consumer.Received += async (model, ea) =>
                     {
-                        var json = Encoding.UTF8.GetString(ea.Body);
+                        var json = Encoding.UTF8.GetString(ea.Body);                        
                         var msg = Jil.JSON.Deserialize<TMessage>(json);
                         await handler.Handle(msg);
                         if (msg.NeedNAck)
