@@ -42,11 +42,7 @@ namespace LightMessager.Pool
             long msgHash = 0;
             if (_unconfirm.TryGetValue(e.DeliveryTag, out msgHash))
             {
-                var ret = MessageQueueHelper.Update(new MessageQueue
-                {
-                    MsgHash = msgHash,
-                    Status = 3 // ArrivedBroker
-                }, 1); // 之前的状态只能是Created 或者 Retry
+                var ret2 = MessageQueueHelper.Update(msgHash, 1, 2, 3/*3 ArrivedBroker*/); // 之前的状态只能是1 Created 或者2 Retry
                 _unconfirm.Remove(e.DeliveryTag);
             }
         }

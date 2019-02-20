@@ -255,18 +255,8 @@ namespace LightMessager.Helper
                 var ret = channel.WaitForConfirms(TimeSpan.FromMilliseconds(time_out));
                 if (!ret)
                 {
-                    message.RetryCount = Math.Max(1, message.RetryCount);
-                    message.RetryCount += 1;
-                    message.LastRetryTime = DateTime.Now;
                     // 数据库更新该条消息的状态信息
-                    MessageQueueHelper.Update(new MessageQueue
-                    {
-                        MsgHash = message.MsgHash,
-                        Status = 2, // Retrying
-                        RetryCount = message.RetryCount,
-                        LastRetryTime = DateTime.Now
-                    }, oldStatus: 1);
-
+                    MessageQueueHelper.Update(message.MsgHash, 1, 2, 2); // 之前的状态只能是1 Created 或者2 Retry
                     retry_send_queue.Enqueue(message);
                 }
             }
@@ -321,18 +311,7 @@ namespace LightMessager.Helper
                 var ret = channel.WaitForConfirms(TimeSpan.FromMilliseconds(time_out));
                 if (!ret)
                 {
-                    message.RetryCount = Math.Max(1, message.RetryCount);
-                    message.RetryCount += 1;
-                    message.LastRetryTime = DateTime.Now;
-                    // 数据库更新该条消息的状态信息
-                    MessageQueueHelper.Update(new MessageQueue
-                    {
-                        MsgHash = message.MsgHash,
-                        Status = 2, // Retrying
-                        RetryCount = message.RetryCount,
-                        LastRetryTime = DateTime.Now
-                    }, oldStatus: 1);
-
+                    MessageQueueHelper.Update(message.MsgHash, 1, 2, 2); // 之前的状态只能是1 Created 或者2 Retry
                     message.Pattern = pattern;
                     retry_pub_queue.Enqueue(message);
                 }

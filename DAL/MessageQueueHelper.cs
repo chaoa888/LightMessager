@@ -85,39 +85,54 @@ namespace LightMessager.DAL
             return ret;
         }
 
-        /// <summary>
-        /// 更新指定的MessageQueue实体对象
-        /// </summary>
-        /// <param name="model">MessageQueue实体</param>
-        /// <param name="fields">需要更新的字段名字</param>
-        /// <returns>是否成功，true为成功</returns>
-        public static bool Update(MessageQueue model, params int[] oldStatus)
+        public static bool Update(long msgHash, short fromStatus, short toStatus)
         {
             var sql = new StringBuilder();
             sql.AppendLine("DECLARE @retVal int ");
             sql.AppendLine("UPDATE [MessageQueue] ");
-            sql.AppendLine("SET [Status]=@Status, [RetryCount]=@RetryCount, [LastRetryTime]=@LastRetryTime, [CanBeRemoved]=@CanBeRemoved ");
-            sql.AppendLine("WHERE [MsgHash]=@MsgHash and ");
-            if (oldStatus.Length == 1)
-            {
-                sql.Append("[Status]=" + oldStatus[0]);
-            }
-            else
-            {
-                for (int i = 0; i < oldStatus.Length; i++)
-                {
-                    sql.Append("[Status]=" + oldStatus[i] + " or ");
-                }
-            }
+            sql.AppendLine("SET [Status]=@toStatus, [RetryCount]=[RetryCount]+1, [LastRetryTime]=@LastRetryTime, [CanBeRemoved]=@CanBeRemoved ");
+            sql.AppendLine("WHERE [MsgHash]=@MsgHash and [Status]=@fromStatus");
             sql.AppendLine("SELECT @retVal = @@Rowcount ");
-            sql.AppendLine("IF (@retVal = 0) ");
-            sql.AppendLine("BEGIN ");
-            sql.AppendLine("UPDATE [MessageQueue] set [Status]=5 WHERE [MsgHash]=@MsgHash "); // Exception
-            sql.AppendLine("END ");
+            sql.AppendLine("IF (@retVal = 0) BEGIN");
+            sql.AppendLine("UPDATE [MessageQueue] set [Status]=5 WHERE [MsgHash]=@MsgHash END"); // 5 Exception
             var ret = false;
             using (var conn = GetOpenConnection())
             {
-                ret = conn.Execute(sql.ToString(), model) > 0;
+                ret = conn.Execute(sql.ToString(), new
+                {
+                    @MsgHash = msgHash,
+                    @fromStatus = fromStatus,
+                    @toStatus = toStatus,
+                    @LastRetryTime = DateTime.Now,
+                    @CanBeRemoved = toStatus == 6 ? true : false // 6 Processed
+                }) > 0;
+            }
+
+            return ret;
+        }
+
+        public static bool Update(long msgHash, short fromStatus1, short fromStatus2, short toStatus)
+        {
+            var sql = new StringBuilder();
+            sql.AppendLine("DECLARE @retVal int ");
+            sql.AppendLine("UPDATE [MessageQueue] ");
+            sql.AppendLine("SET [Status]=@toStatus, [RetryCount]=[RetryCount]+1, [LastRetryTime]=@LastRetryTime, [CanBeRemoved]=@CanBeRemoved ");
+            sql.AppendLine("WHERE [MsgHash]=@MsgHash and ([Status]=@fromStatus1 or [Status]=@fromStatus1)");
+            sql.AppendLine("SELECT @retVal = @@Rowcount ");
+            sql.AppendLine("IF (@retVal = 0) BEGIN");
+            sql.AppendLine("UPDATE [MessageQueue] set [Status]=5 WHERE [MsgHash]=@MsgHash END"); // 5 Exception
+            var ret = false;
+            using (var conn = GetOpenConnection())
+            {
+                ret = conn.Execute(sql.ToString(), new
+                {
+                    @MsgHash = msgHash,
+                    @fromStatus1 = fromStatus1,
+                    @fromStatus2 = fromStatus2,
+                    @toStatus = toStatus,
+                    @LastRetryTime = DateTime.Now,
+                    @CanBeRemoved = toStatus == 6 ? true : false // 6 Processed
+                }) > 0;
             }
 
             return ret;

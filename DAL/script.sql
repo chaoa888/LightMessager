@@ -29,7 +29,7 @@ GO
 EXEC sys.sp_addextendedproperty @name=N'MS_Description', @value=N'Id' , @level0type=N'SCHEMA',@level0name=N'dbo', @level1type=N'TABLE',@level1name=N'MessageQueue', @level2type=N'COLUMN',@level2name=N'Id'
 GO
 
-EXEC sys.sp_addextendedproperty @name=N'MS_Description', @value=N'[MsgHash]' , @level0type=N'SCHEMA',@level0name=N'dbo', @level1type=N'TABLE',@level1name=N'MessageQueue', @level2type=N'COLUMN',@level2name=N'MsgHash'
+EXEC sys.sp_addextendedproperty @name=N'MS_Description', @value=N'消息的hash值' , @level0type=N'SCHEMA',@level0name=N'dbo', @level1type=N'TABLE',@level1name=N'MessageQueue', @level2type=N'COLUMN',@level2name=N'MsgHash'
 GO
 
 EXEC sys.sp_addextendedproperty @name=N'MS_Description', @value=N'消息内容' , @level0type=N'SCHEMA',@level0name=N'dbo', @level1type=N'TABLE',@level1name=N'MessageQueue', @level2type=N'COLUMN',@level2name=N'MsgContent'
