@@ -126,7 +126,7 @@ namespace LightMessager.Helper
                     channel.BasicQos(0, prefetch_count, false);
                     consumer.Received += async (model, ea) =>
                     {
-                        var json = Encoding.UTF8.GetString(ea.Body);                        
+                        var json = Encoding.UTF8.GetString(ea.Body);
                         var msg = Jil.JSON.Deserialize<TMessage>(json);
                         await handler.Handle(msg);
                         if (msg.NeedNAck)
@@ -256,8 +256,16 @@ namespace LightMessager.Helper
                 if (!ret)
                 {
                     // 数据库更新该条消息的状态信息
-                    MessageQueueHelper.Update(message.MsgHash, 1, 2, 2); // 之前的状态只能是1 Created 或者2 Retry
-                    retry_send_queue.Enqueue(message);
+                    if (message.RetryCount < 3)
+                    {
+                        var ok = MessageQueueHelper.Update(message.MsgHash, 1, 2, 2); // 之前的状态只能是1 Created 或者2 Retry
+                        if (ok)
+                        {
+                            message.RetryCount += 1;
+                            message.LastRetryTime = DateTime.Now;
+                            retry_send_queue.Enqueue(message);
+                        }
+                    }
                 }
             }
 
@@ -311,9 +319,17 @@ namespace LightMessager.Helper
                 var ret = channel.WaitForConfirms(TimeSpan.FromMilliseconds(time_out));
                 if (!ret)
                 {
-                    MessageQueueHelper.Update(message.MsgHash, 1, 2, 2); // 之前的状态只能是1 Created 或者2 Retry
-                    message.Pattern = pattern;
-                    retry_pub_queue.Enqueue(message);
+                    if (message.RetryCount < 3)
+                    {
+                        var ok = MessageQueueHelper.Update(message.MsgHash, 1, 2, 2); // 之前的状态只能是1 Created 或者2 Retry
+                        if (ok)
+                        {
+                            message.RetryCount += 1;
+                            message.LastRetryTime = DateTime.Now;
+                            message.Pattern = pattern;
+                            retry_pub_queue.Enqueue(message);
+                        }
+                    }
                 }
             }
 

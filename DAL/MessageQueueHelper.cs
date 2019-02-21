@@ -94,11 +94,11 @@ namespace LightMessager.DAL
             sql.AppendLine("WHERE [MsgHash]=@MsgHash and [Status]=@fromStatus");
             sql.AppendLine("SELECT @retVal = @@Rowcount ");
             sql.AppendLine("IF (@retVal = 0) BEGIN");
-            sql.AppendLine("UPDATE [MessageQueue] set [Status]=5 WHERE [MsgHash]=@MsgHash END"); // 5 Exception
+            sql.AppendLine("UPDATE [MessageQueue] set [Status]=5 WHERE [MsgHash]=@MsgHash END SELECT @retVal"); // 5 Exception
             var ret = false;
             using (var conn = GetOpenConnection())
             {
-                ret = conn.Execute(sql.ToString(), new
+                ret = conn.ExecuteScalar<int>(sql.ToString(), new
                 {
                     @MsgHash = msgHash,
                     @fromStatus = fromStatus,
@@ -120,11 +120,11 @@ namespace LightMessager.DAL
             sql.AppendLine("WHERE [MsgHash]=@MsgHash and ([Status]=@fromStatus1 or [Status]=@fromStatus1)");
             sql.AppendLine("SELECT @retVal = @@Rowcount ");
             sql.AppendLine("IF (@retVal = 0) BEGIN");
-            sql.AppendLine("UPDATE [MessageQueue] set [Status]=5 WHERE [MsgHash]=@MsgHash END"); // 5 Exception
+            sql.AppendLine("UPDATE [MessageQueue] set [Status]=5 WHERE [MsgHash]=@MsgHash END SELECT @retVal"); // 5 Exception
             var ret = false;
             using (var conn = GetOpenConnection())
             {
-                ret = conn.Execute(sql.ToString(), new
+                ret = conn.ExecuteScalar<int>(sql.ToString(), new
                 {
                     @MsgHash = msgHash,
                     @fromStatus1 = fromStatus1,
