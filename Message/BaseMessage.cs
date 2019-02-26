@@ -1,4 +1,4 @@
-﻿using Jil;
+﻿using Newtonsoft.Json;
 using System;
 
 namespace LightMessager.Message
@@ -7,17 +7,17 @@ namespace LightMessager.Message
     {
         internal long MsgHash { set; get; }
 
-        [JilDirective(Ignore = true)]
+        [JsonIgnore]
         public string Source { set; get; }
 
-        [JilDirective(Ignore = true)]
+        [JsonIgnore]
         internal bool NeedNAck { set; get; }
 
         internal int RetryCount { set; get; }
 
         internal DateTime LastRetryTime { set; get; }
 
-        [JilDirective(Ignore = true)]
+        [JsonIgnore]
         internal string Pattern { set; get; }
 
         public DateTime CreatedTime { set; get; }

@@ -3,13 +3,13 @@ using LightMessager.DAL;
 using LightMessager.Message;
 using LightMessager.Pool;
 using Microsoft.Extensions.Configuration;
+using Newtonsoft.Json;
 using NLog;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.IO;
 using System.Text;
 using System.Threading;
 
@@ -127,7 +127,7 @@ namespace LightMessager.Helper
                     consumer.Received += async (model, ea) =>
                     {
                         var json = Encoding.UTF8.GetString(ea.Body);
-                        var msg = Jil.JSON.Deserialize<TMessage>(json);
+                        var msg = JsonConvert.DeserializeObject<TMessage>(json);
                         await handler.Handle(msg);
                         if (msg.NeedNAck)
                         {
@@ -190,7 +190,7 @@ namespace LightMessager.Helper
                     consumer.Received += async (model, ea) =>
                     {
                         var json = Encoding.UTF8.GetString(ea.Body);
-                        var msg = Jil.JSON.Deserialize<TMessage>(json);
+                        var msg = JsonConvert.DeserializeObject<TMessage>(json);
                         await handler.Handle(msg);
                         if (msg.NeedNAck)
                         {
@@ -245,7 +245,7 @@ namespace LightMessager.Helper
                 var queue = string.Empty;
                 EnsureQueue(channel, messageType, out exchange, out route_key, out queue, delaySend);
 
-                var json = Jil.JSON.SerializeDynamic(message, Jil.Options.IncludeInherited);
+                var json = JsonConvert.SerializeObject(message);
                 var bytes = Encoding.UTF8.GetBytes(json);
                 var props = channel.CreateBasicProperties();
                 props.ContentType = "text/plain";
@@ -309,7 +309,7 @@ namespace LightMessager.Helper
                 var queue = string.Empty;
                 EnsureQueue(channel, messageType, out exchange, out route_key, out queue, pattern, delaySend);
 
-                var json = Jil.JSON.SerializeDynamic(message, Jil.Options.IncludeInherited);
+                var json = JsonConvert.SerializeObject(message);
                 var bytes = Encoding.UTF8.GetBytes(json);
                 var props = channel.CreateBasicProperties();
                 props.ContentType = "text/plain";
