@@ -79,7 +79,7 @@ namespace LightMessager.DAL
             var ret = false;
             using (var conn = GetOpenConnection())
             {
-                ret = conn.Execute(sql.ToString(), new { @ids = ids.ToArray() }) > 0;
+                ret = conn.Execute(sql.ToString(), new { @ids = ids }) > 0;
             }
 
             return ret;
