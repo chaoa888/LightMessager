@@ -3,13 +3,31 @@ namespace SilverPay.GenEnum
     /// <summary>
     /// MessageQueue_Status_Enum枚举
     /// </summary>
-    public enum MessageQueue_Status_Enum
-	{
-		Created = 1,
-		Retrying = 2,
-		ArrivedBroker = 3,
-		ArrivedConsumer = 4,
-		Exception = 5,
-		Processed = 6
-	}
+    public sealed class MsgStatus
+    {
+        /// <summary>
+        /// Created: 1
+        /// </summary>
+        public static readonly short Created = 1;
+        /// <summary>
+        /// Retrying: 2
+        /// </summary>
+        public static readonly short Retrying = 2;
+        /// <summary>
+        /// ArrivedBroker: 3
+        /// </summary>
+        public static readonly short ArrivedBroker = 3;
+        /// <summary>
+        /// ArrivedConsumer: 4
+        /// </summary>
+        public static readonly short ArrivedConsumer = 4;
+        /// <summary>
+        /// Exception: 5
+        /// </summary>
+        public static readonly short Exception = 5;
+        /// <summary>
+        /// Processed: 6
+        /// </summary>
+        public static readonly short Processed = 6;
+    }
 }

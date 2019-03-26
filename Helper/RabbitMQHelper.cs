@@ -7,6 +7,7 @@ using Newtonsoft.Json;
 using NLog;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
+using SilverPay.GenEnum;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -28,6 +29,7 @@ namespace LightMessager.Helper
         static IConnection connection;
         static volatile int prepersist_count;
         static readonly int default_retry_wait;
+        static readonly int default_retry_count;
         static List<long> prepersist;
         static ConcurrentQueue<BaseMessage> retry_send_queue;
         static ConcurrentQueue<BaseMessage> retry_pub_queue;
@@ -61,6 +63,7 @@ namespace LightMessager.Helper
             prefetch_count = 100;
             prepersist_count = 0;
             default_retry_wait = 1000; // 1秒
+            default_retry_count = 3; // 消息重试最大3次
             prepersist = new List<long>();
             retry_send_queue = new ConcurrentQueue<BaseMessage>();
             retry_pub_queue = new ConcurrentQueue<BaseMessage>();
@@ -256,16 +259,23 @@ namespace LightMessager.Helper
                 if (!ret)
                 {
                     // 数据库更新该条消息的状态信息
-                    if (message.RetryCount < 3)
+                    if (message.RetryCount < default_retry_count)
                     {
-                        var ok = MessageQueueHelper.Update(message.MsgHash, 1, 2, 2); // 之前的状态只能是1 Created 或者2 Retry
+                        var ok = MessageQueueHelper.Update(
+                            message.MsgHash,
+                            fromStatus1: MsgStatus.Created, // 之前的状态只能是1 Created 或者2 Retry
+                            fromStatus2: MsgStatus.Retrying,
+                            toStatus: 2);
                         if (ok)
                         {
                             message.RetryCount += 1;
                             message.LastRetryTime = DateTime.Now;
                             retry_send_queue.Enqueue(message);
+                            return true;
                         }
+                        throw new Exception("数据库update出现异常");
                     }
+                    throw new Exception("消息发送超过最大重试次数（3次）");
                 }
             }
 
@@ -319,17 +329,24 @@ namespace LightMessager.Helper
                 var ret = channel.WaitForConfirms(TimeSpan.FromMilliseconds(time_out));
                 if (!ret)
                 {
-                    if (message.RetryCount < 3)
+                    if (message.RetryCount < default_retry_count)
                     {
-                        var ok = MessageQueueHelper.Update(message.MsgHash, 1, 2, 2); // 之前的状态只能是1 Created 或者2 Retry
+                        var ok = MessageQueueHelper.Update(
+                             message.MsgHash,
+                             fromStatus1: MsgStatus.Created, // 之前的状态只能是1 Created 或者2 Retry
+                             fromStatus2: MsgStatus.Retrying,
+                             toStatus: 2);
                         if (ok)
                         {
                             message.RetryCount += 1;
                             message.LastRetryTime = DateTime.Now;
                             message.Pattern = pattern;
                             retry_pub_queue.Enqueue(message);
+                            return true;
                         }
+                        throw new Exception("数据库update出现异常");
                     }
+                    throw new Exception("消息发送超过最大重试次数（3次）");
                 }
             }
 
