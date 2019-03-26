@@ -1,6 +1,7 @@
 ﻿using LightMessager.DAL;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
+using SilverPay.GenEnum;
 using System;
 using System.Collections.Generic;
 
@@ -33,17 +34,29 @@ namespace LightMessager.Pool
 
         private void Channel_BasicNacks(object sender, BasicNackEventArgs e)
         {
-            // TODO
+            // 可以不做操作，消息的状态维持在初始的created也是可行的
         }
 
+        // broker正常接受到消息，会触发该ack事件
         private void Channel_BasicAcks(object sender, BasicAckEventArgs e)
         {
             // 数据更新该条消息的状态信息
             long msgHash = 0;
             if (_unconfirm.TryGetValue(e.DeliveryTag, out msgHash))
             {
-                MessageQueueHelper.Update(msgHash, 1, 2, 3/*3 ArrivedBroker*/); // 之前的状态只能是1 Created 或者2 Retry
-                _unconfirm.Remove(e.DeliveryTag);
+                var ok = MessageQueueHelper.Update(
+                    msgHash,
+                    fromStatus1: MsgStatus.Created, // 之前的状态只能是1 Created 或者2 Retry
+                    fromStatus2: MsgStatus.Retrying,
+                    toStatus: MsgStatus.ArrivedBroker);
+                if (ok)
+                {
+                    _unconfirm.Remove(e.DeliveryTag);
+                }
+                else
+                {
+                    throw new Exception("数据库update出现异常");
+                }
             }
         }
 

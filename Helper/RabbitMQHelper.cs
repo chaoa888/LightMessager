@@ -254,12 +254,12 @@ namespace LightMessager.Helper
                 props.ContentType = "text/plain";
                 props.DeliveryMode = 2;
                 channel.BasicPublish(exchange, route_key, props, bytes);
-                var time_out = Math.Max(default_retry_wait, message.RetryCount * 2 /*2倍往上扩大，防止出现均等*/ * 1000);
+                var time_out = Math.Max(default_retry_wait, message.RetryCount_Publish * 2 /*2倍往上扩大，防止出现均等*/ * 1000);
                 var ret = channel.WaitForConfirms(TimeSpan.FromMilliseconds(time_out));
                 if (!ret)
                 {
                     // 数据库更新该条消息的状态信息
-                    if (message.RetryCount < default_retry_count)
+                    if (message.RetryCount_Publish < default_retry_count)
                     {
                         var ok = MessageQueueHelper.Update(
                             message.MsgHash,
@@ -268,7 +268,7 @@ namespace LightMessager.Helper
                             toStatus: 2);
                         if (ok)
                         {
-                            message.RetryCount += 1;
+                            message.RetryCount_Publish += 1;
                             message.LastRetryTime = DateTime.Now;
                             retry_send_queue.Enqueue(message);
                             return true;
@@ -325,11 +325,11 @@ namespace LightMessager.Helper
                 props.ContentType = "text/plain";
                 props.DeliveryMode = 2;
                 channel.BasicPublish(exchange, pattern, props, bytes);
-                var time_out = Math.Max(default_retry_wait, message.RetryCount * 2 /*2倍往上扩大，防止出现均等*/ * 1000);
+                var time_out = Math.Max(default_retry_wait, message.RetryCount_Publish * 2 /*2倍往上扩大，防止出现均等*/ * 1000);
                 var ret = channel.WaitForConfirms(TimeSpan.FromMilliseconds(time_out));
                 if (!ret)
                 {
-                    if (message.RetryCount < default_retry_count)
+                    if (message.RetryCount_Publish < default_retry_count)
                     {
                         var ok = MessageQueueHelper.Update(
                              message.MsgHash,
@@ -338,7 +338,7 @@ namespace LightMessager.Helper
                              toStatus: 2);
                         if (ok)
                         {
-                            message.RetryCount += 1;
+                            message.RetryCount_Publish += 1;
                             message.LastRetryTime = DateTime.Now;
                             message.Pattern = pattern;
                             retry_pub_queue.Enqueue(message);
@@ -363,7 +363,7 @@ namespace LightMessager.Helper
 
         private static bool PrePersistMessage(BaseMessage message)
         {
-            if (message.RetryCount == 0)
+            if (message.RetryCount_Publish == 0)
             {
                 var msgHash = MessageIdHelper.GenerateMessageIdFrom(message.Source);
                 if (prepersist.Contains(msgHash))
@@ -395,7 +395,8 @@ namespace LightMessager.Helper
                             MsgContent = message.Source,
                             RetryCount = 0,
                             CanBeRemoved = false,
-                            CreatedTime = DateTime.Now,
+                            Status = MsgStatus.Created,
+                            CreatedTime = DateTime.Now
                         };
                         MessageQueueHelper.Insert(new_model);
                         return true;
