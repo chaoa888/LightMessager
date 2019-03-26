@@ -94,6 +94,10 @@ rabbitmq对于connection的恢复有一定的缺陷：
 
     + 网络异常的情况中连接执行recovery，此时delivery tags都会过期失效，rabbitmq客户端并不会发送带有过期tag的ack消息。这又会进一步导致rabbitmq broker重发所有没有收到ack确认的消息，因此consumer一定要能够处理重复达到的消息才行
 
+	+ rabbitmq提供了一个属性值`redelivered`，用它来标识一条消息是否是重传的。但不幸的是如前面所说，当该属性值为`true`的时候并不能说明客户端已经处理过该条消息；不过可以确信的是如果值为`false`，那么这条消息一定没有被处理过！
+
+	+ 采用nack告知rabbitmq node时要注意`requeue/redelivery loop`这种情况的发生，常见的解决办法是跟踪当前消息的`redelivery`次数，要么做延迟requeueing，要么标记状态直接丢弃
+
 ### Roadmap
 + 可靠消息投递
 + 延时发送
