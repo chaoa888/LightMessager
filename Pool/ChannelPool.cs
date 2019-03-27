@@ -1,7 +1,6 @@
 ﻿using LightMessager.DAL;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
-using SilverPay.GenEnum;
 using System;
 using System.Collections.Generic;
 

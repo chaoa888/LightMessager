@@ -90,7 +90,7 @@ rabbitmq对于connection的恢复有一定的缺陷：
   这个方向上可以使用*consumer ack*机制，要小心的是，
     > Acknowledgements with stale delivery tags will not be sent. Applications that use manual acknowledgements and automatic recovery must be capable of handling redeliveries.
 
-    + rabbitmq会针对重传的消息设置`redelivered`标志值，这意味这consumer可能在之前有处理过该条消息；为什么是可能，原因在于该条消息可能刚发送出去，还在传递过程中，整个连接就断开了！
+    + rabbitmq会针对重传的消息设置`redelivered`标志值，这意味着consumer可能在之前有处理过该条消息；为什么是可能，原因在于该条消息可能刚发送出去，还在传递过程中，整个连接就断开了！
 
     + 网络异常的情况中连接执行recovery，此时delivery tags都会过期失效，rabbitmq客户端并不会发送带有过期tag的ack消息。这又会进一步导致rabbitmq broker重发所有没有收到ack确认的消息，因此consumer一定要能够处理重复达到的消息才行
 

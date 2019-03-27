@@ -13,8 +13,15 @@ namespace LightMessager.Message
         [JsonIgnore]
         internal bool NeedNAck { set; get; }
 
+        /// <summary>
+        /// publisher -> broker
+        /// </summary>
         internal int RetryCount_Publish { set; get; }
-        internal int RetryCount_Consume { set; get; }
+
+        /// <summary>
+        /// broker -> consumer
+        /// </summary>
+        internal int RetryCount_Deliver { set; get; }
 
         internal DateTime LastRetryTime { set; get; }
 

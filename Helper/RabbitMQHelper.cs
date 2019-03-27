@@ -7,7 +7,6 @@ using Newtonsoft.Json;
 using NLog;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
-using SilverPay.GenEnum;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -109,7 +108,8 @@ namespace LightMessager.Helper
         /// </summary>
         /// <typeparam name="TMessage">消息类型</typeparam>
         /// <typeparam name="THandler">消息处理器类型</typeparam>
-        public static void RegisterHandler<TMessage, THandler>()
+        /// <param name="redeliveryCheck">是否开启重发确认；如果消息处理器逻辑已经实现为幂等则不需要开启以便节省计算资源，否则请打开该选项</param>
+        public static void RegisterHandler<TMessage, THandler>(bool redeliveryCheck = false)
             where THandler : BaseHandleMessages<TMessage>
             where TMessage : BaseMessage
         {
@@ -129,16 +129,23 @@ namespace LightMessager.Helper
                     channel.BasicQos(0, prefetch_count, false);
                     consumer.Received += async (model, ea) =>
                     {
-                        var json = Encoding.UTF8.GetString(ea.Body);
-                        var msg = JsonConvert.DeserializeObject<TMessage>(json);
-                        await handler.Handle(msg);
-                        if (msg.NeedNAck)
+                        if (!ea.Redelivered) // 之前一定没有处理过该条消息
                         {
-                            channel.BasicNack(ea.DeliveryTag, false, true);
+                            var json = Encoding.UTF8.GetString(ea.Body);
+                            var msg = JsonConvert.DeserializeObject<TMessage>(json);
+                            await handler.Handle(msg);
+                            if (msg.NeedNAck)
+                            {
+                                channel.BasicNack(ea.DeliveryTag, false, true);
+                            }
+                            else
+                            {
+                                channel.BasicAck(ea.DeliveryTag, false);
+                            }
                         }
                         else
                         {
-                            channel.BasicAck(ea.DeliveryTag, false);
+
                         }
                     };
 
@@ -161,8 +168,9 @@ namespace LightMessager.Helper
         /// <typeparam name="TMessage">消息类型</typeparam>
         /// <typeparam name="THandler">消息处理器类型</typeparam>
         /// <param name="subscriberName">订阅器的名称</param>
+        /// <param name="redeliveryCheck">是否开启重发确认；如果消息处理器逻辑已经实现为幂等则不需要开启以便节省计算资源，否则请打开该选项</param>
         /// <param name="subscribePatterns">订阅器支持的消息模式</param>
-        public static void RegisterHandlerAs<TMessage, THandler>(string subscriberName, params string[] subscribePatterns)
+        public static void RegisterHandlerAs<TMessage, THandler>(string subscriberName, bool redeliveryCheck = false, params string[] subscribePatterns)
             where THandler : BaseHandleMessages<TMessage>
             where TMessage : BaseMessage
         {
@@ -265,7 +273,7 @@ namespace LightMessager.Helper
                             message.MsgHash,
                             fromStatus1: MsgStatus.Created, // 之前的状态只能是1 Created 或者2 Retry
                             fromStatus2: MsgStatus.Retrying,
-                            toStatus: 2);
+                            toStatus: MsgStatus.Retrying);
                         if (ok)
                         {
                             message.RetryCount_Publish += 1;
@@ -275,7 +283,7 @@ namespace LightMessager.Helper
                         }
                         throw new Exception("数据库update出现异常");
                     }
-                    throw new Exception("消息发送超过最大重试次数（3次）");
+                    throw new Exception($"消息发送超过最大重试次数（{default_retry_count}次）");
                 }
             }
 
@@ -335,7 +343,7 @@ namespace LightMessager.Helper
                              message.MsgHash,
                              fromStatus1: MsgStatus.Created, // 之前的状态只能是1 Created 或者2 Retry
                              fromStatus2: MsgStatus.Retrying,
-                             toStatus: 2);
+                             toStatus: MsgStatus.Retrying);
                         if (ok)
                         {
                             message.RetryCount_Publish += 1;
@@ -346,7 +354,7 @@ namespace LightMessager.Helper
                         }
                         throw new Exception("数据库update出现异常");
                     }
-                    throw new Exception("消息发送超过最大重试次数（3次）");
+                    throw new Exception($"消息发送超过最大重试次数（{default_retry_count}次）");
                 }
             }
 
