@@ -129,10 +129,67 @@ namespace LightMessager.Helper
                     channel.BasicQos(0, prefetch_count, false);
                     consumer.Received += async (model, ea) =>
                     {
-                        if (!ea.Redelivered) // 之前一定没有处理过该条消息
+                        var json = Encoding.UTF8.GetString(ea.Body);
+                        var msg = JsonConvert.DeserializeObject<TMessage>(json);
+                        if (redeliveryCheck)
                         {
-                            var json = Encoding.UTF8.GetString(ea.Body);
-                            var msg = JsonConvert.DeserializeObject<TMessage>(json);
+                            if (!ea.Redelivered) // 之前一定没有处理过该条消息
+                            {
+                                await handler.Handle(msg);
+                                if (msg.NeedNAck)
+                                {
+                                    channel.BasicNack(ea.DeliveryTag, false, true);
+                                    MessageQueueHelper.Update(
+                                    msg.MsgHash,
+                                    fromStatus: MsgStatus.ArrivedBroker,
+                                    toStatus: MsgStatus.Exception);
+                                }
+                                else
+                                {
+                                    channel.BasicAck(ea.DeliveryTag, false);
+                                    MessageQueueHelper.Update(
+                                    msg.MsgHash,
+                                    fromStatus: MsgStatus.ArrivedBroker,
+                                    toStatus: MsgStatus.Consumed);
+                                }
+                            }
+                            else
+                            {
+                                var m = MessageQueueHelper.GetModelBy(msg.MsgHash);
+                                if (m.Status == MsgStatus.Exception)
+                                {
+                                    await handler.Handle(msg);
+                                    if (msg.NeedNAck)
+                                    {
+                                        channel.BasicNack(ea.DeliveryTag, false, true);
+                                    }
+                                    else
+                                    {
+                                        channel.BasicAck(ea.DeliveryTag, false);
+                                    }
+                                }
+                                else if (m.Status == MsgStatus.ArrivedBroker)
+                                {
+                                    // 相对特殊的一种情况，Redelivered为true，但是本地消息实际上只到达第三档状态
+                                    // 说明在消息刚从broker出来，rabbitmq重置了链接
+                                    await handler.Handle(msg);
+                                    if (msg.NeedNAck)
+                                    {
+                                        channel.BasicNack(ea.DeliveryTag, false, true);
+                                    }
+                                    else
+                                    {
+                                        channel.BasicAck(ea.DeliveryTag, false);
+                                    }
+                                }
+                                else
+                                {
+                                    // 为了保持幂等这里不做任何处理
+                                }
+                            }
+                        }
+                        else
+                        {
                             await handler.Handle(msg);
                             if (msg.NeedNAck)
                             {
@@ -142,10 +199,6 @@ namespace LightMessager.Helper
                             {
                                 channel.BasicAck(ea.DeliveryTag, false);
                             }
-                        }
-                        else
-                        {
-
                         }
                     };
 
@@ -202,14 +255,74 @@ namespace LightMessager.Helper
                     {
                         var json = Encoding.UTF8.GetString(ea.Body);
                         var msg = JsonConvert.DeserializeObject<TMessage>(json);
-                        await handler.Handle(msg);
-                        if (msg.NeedNAck)
+                        if (redeliveryCheck)
                         {
-                            channel.BasicNack(ea.DeliveryTag, false, true);
+                            if (!ea.Redelivered) // 之前一定没有处理过该条消息
+                            {
+                                await handler.Handle(msg);
+                                if (msg.NeedNAck)
+                                {
+                                    channel.BasicNack(ea.DeliveryTag, false, true);
+                                    MessageQueueHelper.Update(
+                                    msg.MsgHash,
+                                    fromStatus: MsgStatus.ArrivedBroker,
+                                    toStatus: MsgStatus.Exception);
+                                }
+                                else
+                                {
+                                    channel.BasicAck(ea.DeliveryTag, false);
+                                    MessageQueueHelper.Update(
+                                    msg.MsgHash,
+                                    fromStatus: MsgStatus.ArrivedBroker,
+                                    toStatus: MsgStatus.Consumed);
+                                }
+                            }
+                            else
+                            {
+                                var m = MessageQueueHelper.GetModelBy(msg.MsgHash);
+                                if (m.Status == MsgStatus.Exception)
+                                {
+                                    await handler.Handle(msg);
+                                    if (msg.NeedNAck)
+                                    {
+                                        channel.BasicNack(ea.DeliveryTag, false, true);
+                                    }
+                                    else
+                                    {
+                                        channel.BasicAck(ea.DeliveryTag, false);
+                                    }
+                                }
+                                else if (m.Status == MsgStatus.ArrivedBroker)
+                                {
+                                    // 相对特殊的一种情况，Redelivered为true，但是本地消息实际上只到达第三档状态
+                                    // 说明在消息刚从broker出来，rabbitmq重置了链接
+                                    await handler.Handle(msg);
+                                    if (msg.NeedNAck)
+                                    {
+                                        channel.BasicNack(ea.DeliveryTag, false, true);
+                                    }
+                                    else
+                                    {
+                                        channel.BasicAck(ea.DeliveryTag, false);
+                                    }
+                                }
+                                else
+                                {
+                                    // 为了保持幂等这里不做任何处理
+                                }
+                            }
                         }
                         else
                         {
-                            channel.BasicAck(ea.DeliveryTag, false);
+                            await handler.Handle(msg);
+                            if (msg.NeedNAck)
+                            {
+                                channel.BasicNack(ea.DeliveryTag, false, true);
+                            }
+                            else
+                            {
+                                channel.BasicAck(ea.DeliveryTag, false);
+                            }
                         }
                     };
 
