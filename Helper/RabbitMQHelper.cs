@@ -108,7 +108,7 @@ namespace LightMessager.Helper
                     BaseMessage pub_item_fanout;
                     while (retry_fanout_pub_queue.TryDequeue(out pub_item_fanout))
                     {
-                       FanoutPublish(pub_item_fanout);
+                        FanoutPublish(pub_item_fanout);
                     }
                     Thread.Sleep(1000 * 5);
                 }
@@ -371,13 +371,22 @@ namespace LightMessager.Helper
                     var exchange = string.Empty;
                     var queue = string.Empty;
                     ConsumerEnsureQueue(channel, type, out exchange, out queue);
-
-                    consumer.Received += async (model, ea) =>
+                    TMessage msg = null;//闭包获取数据
+                    try
                     {
-                        var json = Encoding.UTF8.GetString(ea.Body);
-                        var msg = JsonConvert.DeserializeObject<TMessage>(json);
-                        await handler.Handle(msg);
-                    };
+                        consumer.Received += async (model, ea) =>
+                        {
+                            var json = Encoding.UTF8.GetString(ea.Body);
+                            msg = JsonConvert.DeserializeObject<TMessage>(json);
+                            await handler.Handle(msg);
+                        };
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageQueueHelper.UpdateCanbeRemoveIsFalse(msg.MsgHash);
+                        _logger.Error("RegisterHandler()出错，异常：" + ex.Message + "；堆栈：" + ex.StackTrace);
+                    }
+
                     channel.BasicConsume(queue, true, consumer);
                 }
             }
@@ -524,7 +533,7 @@ namespace LightMessager.Helper
         }
 
         /// <summary>
-        /// fanout模式发布条消息,此模式适合两个以上订阅者使用，如果只有一个建议用默认模式
+        /// fanout模式发布消息,此模式适合两种及以上业务用同一条消息订阅使用，如果只有一种业务或者单机建议用默认模式
         /// </summary>
         /// <param name="message"></param>
         /// <param name="delaySend"></param>
@@ -536,7 +545,10 @@ namespace LightMessager.Helper
                 throw new ArgumentNullException("message.Source");
             }
 
-            if (!PrePersistMessage(message))
+            ///fanout模式不同其他模式，又无法获取到订阅者数量，于是直接默认CanbeRemove为true
+            ///如果出现异常在设为false，具体在哪儿失败了，怎么恢复就需要调用者自己去查了
+            ///数据库消息只提供一个记录，供查证用
+            if (!PrePersistMessage(message, true))
             {
                 return false;
             }
@@ -545,7 +557,7 @@ namespace LightMessager.Helper
             using (var pooled = InnerCreateChannel(messageType))
             {
                 IModel channel = pooled.Channel;
-                pooled.PreRecord(message.MsgHash);
+               // pooled.PreRecord(message.MsgHash);无需修改状态了
 
                 var exchange = string.Empty;
                 PublishEnsureQueue(channel, messageType, out exchange);
@@ -590,7 +602,7 @@ namespace LightMessager.Helper
             return pool.Get() as PooledChannel;
         }
 
-        private static bool PrePersistMessage(BaseMessage message)
+        private static bool PrePersistMessage(BaseMessage message, bool isFanout = false)
         {
             if (message.RetryCount_Publish == 0)
             {
@@ -627,6 +639,10 @@ namespace LightMessager.Helper
                             Status = MsgStatus.Created,
                             CreatedTime = DateTime.Now
                         };
+                        if (isFanout)
+                        {
+                            new_model.CanBeRemoved = true;
+                        }
                         MessageQueueHelper.Insert(new_model);
                         return true;
                     }
