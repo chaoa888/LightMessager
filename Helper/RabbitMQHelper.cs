@@ -32,10 +32,13 @@ namespace LightMessager.Helper
         static List<long> prepersist;
         static ConcurrentQueue<BaseMessage> retry_send_queue;
         static ConcurrentQueue<BaseMessage> retry_pub_queue;
+        static ConcurrentQueue<BaseMessage> retry_fanout_pub_queue;
         static ConcurrentDictionary<Type, QueueInfo> dict_info;
         static ConcurrentDictionary<Type, object> dict_func;
         static ConcurrentDictionary<(Type, string), QueueInfo> dict_info_name; // with name
         static ConcurrentDictionary<(Type, string), object> dict_func_name; // with name
+        static ConcurrentDictionary<Type, string> dict_info_fanout;
+        static ConcurrentDictionary<Type, object> dict_func_fanout;
         static ConcurrentDictionary<Type, ObjectPool<IPooledWapper>> pools;
         static readonly ushort prefetch_count;
         static object lockobj = new object();
@@ -66,10 +69,13 @@ namespace LightMessager.Helper
             prepersist = new List<long>();
             retry_send_queue = new ConcurrentQueue<BaseMessage>();
             retry_pub_queue = new ConcurrentQueue<BaseMessage>();
+            retry_fanout_pub_queue = new ConcurrentQueue<BaseMessage>();
             dict_info = new ConcurrentDictionary<Type, QueueInfo>();
             dict_func = new ConcurrentDictionary<Type, object>();
             dict_info_name = new ConcurrentDictionary<(Type, string), QueueInfo>();
             dict_func_name = new ConcurrentDictionary<(Type, string), object>();
+            dict_info_fanout = new ConcurrentDictionary<Type, string>();
+            dict_func_fanout = new ConcurrentDictionary<Type, object>();
             pools = new ConcurrentDictionary<Type, ObjectPool<IPooledWapper>>();
             factory = new ConnectionFactory();
             factory.UserName = configurationRoot.GetSection("LightMessager:UserName").Value; // "admin";
@@ -94,9 +100,15 @@ namespace LightMessager.Helper
                     }
 
                     BaseMessage pub_item;
-                    while (retry_send_queue.TryDequeue(out pub_item))
+                    while (retry_pub_queue.TryDequeue(out pub_item))
                     {
                         Publish(pub_item, pub_item.Pattern);
+                    }
+
+                    BaseMessage pub_item_fanout;
+                    while (retry_fanout_pub_queue.TryDequeue(out pub_item_fanout))
+                    {
+                       FanoutPublish(pub_item_fanout);
                     }
                     Thread.Sleep(1000 * 5);
                 }
@@ -339,6 +351,43 @@ namespace LightMessager.Helper
         }
 
         /// <summary>
+        /// 注册消息处理器,fanout模式
+        /// </summary>
+        /// <typeparam name="TMessage">消息类型</typeparam>
+        /// <typeparam name="THandler">消息处理器类型</typeparam>
+        public static void RegisterHandlerForFanout<TMessage, THandler>()
+            where THandler : BaseHandleMessages<TMessage>
+            where TMessage : BaseMessage
+        {
+            try
+            {
+                var type = typeof(TMessage);
+                if (!dict_func.ContainsKey(type))
+                {
+                    var handler = dict_func_fanout.GetOrAdd(type, t => Activator.CreateInstance<THandler>()) as THandler;
+                    var channel = connection.CreateModel();
+                    var consumer = new EventingBasicConsumer(channel);
+
+                    var exchange = string.Empty;
+                    var queue = string.Empty;
+                    ConsumerEnsureQueue(channel, type, out exchange, out queue);
+
+                    consumer.Received += async (model, ea) =>
+                    {
+                        var json = Encoding.UTF8.GetString(ea.Body);
+                        var msg = JsonConvert.DeserializeObject<TMessage>(json);
+                        await handler.Handle(msg);
+                    };
+                    channel.BasicConsume(queue, true, consumer);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Debug("RegisterHandler()出错，异常：" + ex.Message + "；堆栈：" + ex.StackTrace);
+            }
+        }
+
+        /// <summary>
         /// 发送一条消息
         /// </summary>
         /// <typeparam name="TMessage">消息类型</typeparam>
@@ -463,6 +512,65 @@ namespace LightMessager.Helper
                             message.LastRetryTime = DateTime.Now;
                             message.Pattern = pattern;
                             retry_pub_queue.Enqueue(message);
+                            return true;
+                        }
+                        throw new Exception("数据库update出现异常");
+                    }
+                    throw new Exception($"消息发送超过最大重试次数（{default_retry_count}次）");
+                }
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// fanout模式发布条消息,此模式适合两个以上订阅者使用，如果只有一个建议用默认模式
+        /// </summary>
+        /// <param name="message"></param>
+        /// <param name="delaySend"></param>
+        /// <returns></returns>
+        public static bool FanoutPublish(BaseMessage message)
+        {
+            if (string.IsNullOrWhiteSpace(message.Source))
+            {
+                throw new ArgumentNullException("message.Source");
+            }
+
+            if (!PrePersistMessage(message))
+            {
+                return false;
+            }
+
+            var messageType = message.GetType();
+            using (var pooled = InnerCreateChannel(messageType))
+            {
+                IModel channel = pooled.Channel;
+                pooled.PreRecord(message.MsgHash);
+
+                var exchange = string.Empty;
+                PublishEnsureQueue(channel, messageType, out exchange);
+
+                var json = JsonConvert.SerializeObject(message);
+                var bytes = Encoding.UTF8.GetBytes(json);
+                var props = channel.CreateBasicProperties();
+                props.Persistent = true;
+                channel.BasicPublish(exchange, "", props, bytes);
+                var time_out = Math.Max(default_retry_wait, message.RetryCount_Publish * 2 /*2倍往上扩大，防止出现均等*/ * 1000);
+                var ret = channel.WaitForConfirms(TimeSpan.FromMilliseconds(time_out));
+                if (!ret)
+                {
+                    if (message.RetryCount_Publish < default_retry_count)
+                    {
+                        var ok = MessageQueueHelper.Update(
+                             message.MsgHash,
+                             fromStatus1: MsgStatus.Created, // 之前的状态只能是1 Created 或者2 Retry
+                             fromStatus2: MsgStatus.Retrying,
+                             toStatus: MsgStatus.Retrying);
+                        if (ok)
+                        {
+                            message.RetryCount_Publish += 1;
+                            message.LastRetryTime = DateTime.Now;
+                            retry_fanout_pub_queue.Enqueue(message);
                             return true;
                         }
                         throw new Exception("数据库update出现异常");
@@ -633,6 +741,32 @@ namespace LightMessager.Helper
             }
         }
 
+        private static void PublishEnsureQueue(IModel channel, Type messageType, out string exchange)
+        {
+            var type = messageType;
+            if (!dict_info_fanout.ContainsKey(type))
+            {
+                var info = GetQueueInfoForFanout(messageType);
+                exchange = info;
+                channel.ExchangeDeclare(exchange, ExchangeType.Fanout, durable: true);
+            }
+            else
+            {
+                var info = GetQueueInfoForFanout(messageType);
+                exchange = info;
+            }
+        }
+
+        private static void ConsumerEnsureQueue(IModel channel, Type messageType, out string exchange, out string queue)
+        {
+            var info = GetQueueInfoForFanout(messageType);
+            exchange = info;
+            channel.ExchangeDeclare(exchange, ExchangeType.Fanout, durable: true);
+            queue = channel.QueueDeclare().QueueName;
+            channel.QueueBind(queue: queue, exchange: exchange, routingKey: "", arguments: null);
+
+        }
+
         private static QueueInfo GetQueueInfo(Type messageType)
         {
             var type_name = messageType.IsGenericType ? messageType.GenericTypeArguments[0].Name : messageType.Name;
@@ -655,6 +789,14 @@ namespace LightMessager.Helper
                 DefaultRouteKey = type_name + ".input",
                 Queue = type_name + ".input"
             });
+
+            return info;
+        }
+
+        private static string GetQueueInfoForFanout(Type messageType)
+        {
+            var type_name = messageType.IsGenericType ? messageType.GenericTypeArguments[0].Name : messageType.Name;
+            var info = dict_info_fanout.GetOrAdd(messageType, type_name + ".exchange");
 
             return info;
         }
