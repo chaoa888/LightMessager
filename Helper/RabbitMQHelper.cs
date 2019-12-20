@@ -614,11 +614,8 @@ namespace LightMessager.Helper
                 else
                 {
                     message.MsgHash = msgHash;
-                    if (Interlocked.Increment(ref prepersist_count) != 1000)
-                    {
-                        prepersist.Add(msgHash);
-                    }
-                    else
+                    prepersist.Add(msgHash);
+                    if (Interlocked.Increment(ref prepersist_count) >= 1000)
                     {
                         prepersist.RemoveRange(0, 950);
                     }
