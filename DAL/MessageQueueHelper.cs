@@ -111,6 +111,26 @@ namespace LightMessager.DAL
             return ret;
         }
 
+        public static bool UpdateCanbeRemoveIsFalse(long msgHash)
+        {
+            var sql = new StringBuilder();
+            sql.AppendLine("UPDATE [MessageQueue] ");
+            sql.AppendLine("SET [CanBeRemoved]=@CanBeRemoved ");
+            sql.AppendLine("WHERE [MsgHash]=@MsgHash");
+           
+            var ret = false;
+            using (var conn = GetOpenConnection())
+            {
+                ret = conn.ExecuteScalar<int>(sql.ToString(), new
+                {
+                    @MsgHash = msgHash,
+                    @CanBeRemoved = true
+                }) > 0;
+            }
+
+            return ret;
+        }
+
         public static bool Update(long msgHash, short fromStatus1, short fromStatus2, short toStatus)
         {
             var sql = new StringBuilder();
