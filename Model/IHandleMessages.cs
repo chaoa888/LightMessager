@@ -1,6 +1,6 @@
 ﻿using System.Threading.Tasks;
 
-namespace LightMessager.Message
+namespace LightMessager.Model
 {
     public interface IHandleMessages
     {
@@ -10,11 +10,14 @@ namespace LightMessager.Message
     // 摘要:
     //     Message handler interface. Implement this in order to get to handle messages
     //     of a specific type
-    public interface IHandleMessages<in TMessage> : IHandleMessages where TMessage : BaseMessage
+    public interface IHandleMessages<in TMessage> : IHandleMessages 
+        where TMessage : BaseMessage
     {
+        void Handle(TMessage message);
+
         //
         // 摘要:
         //     This method will be invoked with a message of type TMessage
-        Task Handle(TMessage message);
+        Task HandleAsync(TMessage message);
     }
 }

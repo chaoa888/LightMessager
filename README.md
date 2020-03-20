@@ -57,6 +57,19 @@ public class CustomTaskScheduler : TaskScheduler
 var cf = new ConnectionFactory();
 cf.TaskScheduler = new CustomTaskScheduler();
 ```
+**2020-03-18 补充**：
+客户端版本5.x往上走（甚至可能再靠前），我查看了5.1.0的源代码确认TaskScheduler这个属性已经没有在使用了。由此修正下前面的说法：这样一来消息触发回调执行的默认顺序就是消息的投递顺序！
+
+另外从代码中还发现了一个叫做`AsyncEventingBasicConsumer`的[类型](https://gigi.nullneuron.net/gigilabs/asynchronous-rabbitmq-consumers-in-net/)，这货可以让我们非常轻松的写出真正的异步回调逻辑（同时仍然保持执行的顺序性）：
+```csharp
+// 打开异步消费开关
+var cf = new ConnectionFactory();
+cf.DispatchConsumersAsync = true;
+
+// 显式使用AsyncEventHandler
+var consumer = new AsyncEventingBasicConsumer(channel);
+consumer.Received += Consumer_Received;
+```
 
 ### 自动恢复
 rabbitmq自带有`automatic recovery`特性，能在网络发生异常时进行自我恢复。这包括连接的恢复和网络拓扑（topology）（queues、exchanges、bindings and consumers）的恢复。

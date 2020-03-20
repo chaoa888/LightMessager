@@ -6,11 +6,10 @@ using System.Threading.Tasks;
 namespace LightMessager.Pool
 {
     internal interface IPooledWapper : IDisposable
-    {
-        DateTime LastGetTime { set; get; }
-    }
+    { }
 
-    internal class ObjectPool<T> : IDisposable where T : IPooledWapper
+    internal class ObjectPool<T> : IDisposable
+        where T : IPooledWapper
     {
         private static int _id = 0;
         private int _minRetained;
@@ -24,7 +23,9 @@ namespace LightMessager.Pool
 
         public ObjectPool(Func<ObjectPool<T>, T> objectGenerator, int minRetained = 0, int maxRetained = 50)
         {
-            if (objectGenerator == null) throw new ArgumentNullException("objectGenerator");
+            if (objectGenerator == null)
+                throw new ArgumentNullException("objectGenerator");
+
             Interlocked.Increment(ref _id);
             _objects = new ConcurrentBag<T>();
             _objectGenerator = objectGenerator;
@@ -35,25 +36,27 @@ namespace LightMessager.Pool
 
             // 预先初始化
             if (minRetained > 0)
-            {
                 Parallel.For(0, minRetained, i => _objects.Add(_objectGenerator(this)));
-            }
         }
 
         public T Get()
         {
+            if (_disposed)
+                throw new ObjectDisposedException(nameof(ObjectPool<T>));
+
             sync.Wait();
             T item;
             if (!_objects.TryTake(out item))
-            {
                 item = _objectGenerator(this);
-            }
-            item.LastGetTime = DateTime.Now;
+
             return item;
         }
 
         public void Put(T item)
         {
+            if (_disposed)
+                throw new ObjectDisposedException(nameof(ObjectPool<T>));
+
             _objects.Add(item);
             sync.Release();
         }
@@ -69,9 +72,8 @@ namespace LightMessager.Pool
         protected virtual void Dispose(bool disposing)
         {
             if (_disposed)
-            {
                 return;
-            }
+
             if (disposing)
             {
                 // 清理托管资源
