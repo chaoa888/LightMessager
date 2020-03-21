@@ -131,15 +131,10 @@ QoS决定了信道上`in flight`的消息的条数。配合批量的ack/nack，�
 
 + 采用nack告知rabbitmq node时要注意`requeue/redelivery loop`这种情况的发生，常见的解决办法是跟踪当前消息的`redelivery`次数，要么做延迟requeueing，要么标记状态直接丢弃。
 
-### Roadmap
-+ 可靠消息投递
-+ 延时发送
-+ 效率改进
-+ QoS, multiple
-
 
 
 ### 参考链接
+
 https://www.rabbitmq.com/dotnet-api-guide.html
 https://www.rabbitmq.com/confirms.html
 https://www.rabbitmq.com/consumers.html

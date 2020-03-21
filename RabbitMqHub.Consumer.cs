@@ -9,7 +9,7 @@ namespace LightMessager
 {
     public sealed partial class RabbitMqHub
     {
-        public void RegisterHandler<TMessage, THandler>(bool asyncConsume = false, bool redeliveryCheck = false)
+        public void RegisterHandler<TMessage, THandler>(bool asyncConsume = false)
             where THandler : BaseMessageHandler<TMessage>
             where TMessage : BaseMessage
         {
@@ -19,12 +19,12 @@ namespace LightMessager
             if (!asyncConsume)
             {
                 channel = _connection.CreateModel();
-                consumer = SetupConsumer<TMessage, THandler>(channel, handler, redeliveryCheck);
+                consumer = SetupConsumer<TMessage, THandler>(channel, handler);
             }
             else
             {
                 channel = _asynConnection.CreateModel();
-                consumer = SetupAsyncConsumer<TMessage, THandler>(channel, handler, redeliveryCheck);
+                consumer = SetupAsyncConsumer<TMessage, THandler>(channel, handler);
             }
             /*
               @param prefetchSize maximum amount of content (measured in octets) that the server will deliver, 0 if unlimited
@@ -37,7 +37,7 @@ namespace LightMessager
             channel.BasicConsume(info.Queue, false, consumer);
         }
 
-        public void RegisterHandler<TMessage, THandler>(bool asyncConsume = false, bool redeliveryCheck = false, params string[] subscribePatterns)
+        public void RegisterHandler<TMessage, THandler>(string subscriber, string[] subscribeKeys, bool asyncConsume = false)
             where THandler : BaseMessageHandler<TMessage>
             where TMessage : BaseMessage
         {
@@ -47,12 +47,12 @@ namespace LightMessager
             if (!asyncConsume)
             {
                 channel = _connection.CreateModel();
-                consumer = SetupConsumer<TMessage, THandler>(channel, handler, redeliveryCheck);
+                consumer = SetupConsumer<TMessage, THandler>(channel, handler);
             }
             else
             {
                 channel = _asynConnection.CreateModel();
-                consumer = SetupAsyncConsumer<TMessage, THandler>(channel, handler, redeliveryCheck);
+                consumer = SetupAsyncConsumer<TMessage, THandler>(channel, handler);
             }
             /*
               @param prefetchSize maximum amount of content (measured in octets) that the server will deliver, 0 if unlimited
@@ -61,11 +61,39 @@ namespace LightMessager
             */
             channel.BasicQos(0, _prefetch_count, false);
 
-            EnsurePublishQueue(channel, typeof(TMessage), subscribePatterns, out QueueInfo info);
+            EnsureRouteQueue(channel, typeof(TMessage), subscriber, subscribeKeys, out QueueInfo info);
             channel.BasicConsume(info.Queue, false, consumer);
         }
 
-        private EventingBasicConsumer SetupConsumer<TMessage, THandler>(IModel channel, THandler handler, bool redeliveryCheck)
+        public void RegisterHandler<TMessage, THandler>(string subscriber, bool asyncConsume = false)
+            where THandler : BaseMessageHandler<TMessage>
+            where TMessage : BaseMessage
+        {
+            var handler = Activator.CreateInstance(typeof(THandler), _repository) as THandler;
+            IModel channel = null;
+            IBasicConsumer consumer = null;
+            if (!asyncConsume)
+            {
+                channel = _connection.CreateModel();
+                consumer = SetupConsumer<TMessage, THandler>(channel, handler);
+            }
+            else
+            {
+                channel = _asynConnection.CreateModel();
+                consumer = SetupAsyncConsumer<TMessage, THandler>(channel, handler);
+            }
+            /*
+              @param prefetchSize maximum amount of content (measured in octets) that the server will deliver, 0 if unlimited
+              @param prefetchCount maximum number of messages that the server will deliver, 0 if unlimited
+              @param global true if the settings should be applied to the entire channel rather than each consumer
+            */
+            channel.BasicQos(0, _prefetch_count, false);
+
+            EnsurePublishQueue(channel, typeof(TMessage), subscriber, out QueueInfo info);
+            channel.BasicConsume(info.Queue, false, consumer);
+        }
+
+        private EventingBasicConsumer SetupConsumer<TMessage, THandler>(IModel channel, THandler handler)
             where THandler : BaseMessageHandler<TMessage>
             where TMessage : BaseMessage
         {
@@ -101,7 +129,7 @@ namespace LightMessager
             return consumer;
         }
 
-        private AsyncEventingBasicConsumer SetupAsyncConsumer<TMessage, THandler>(IModel channel, THandler handler, bool redeliveryCheck)
+        private AsyncEventingBasicConsumer SetupAsyncConsumer<TMessage, THandler>(IModel channel, THandler handler)
             where THandler : BaseMessageHandler<TMessage>
             where TMessage : BaseMessage
         {

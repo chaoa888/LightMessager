@@ -1,4 +1,4 @@
-namespace LightMessager.Repository
+namespace LightMessager.Model
 {
     public sealed class MessageState
     {

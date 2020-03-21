@@ -12,7 +12,6 @@ namespace LightMessager.Pool
 {
     internal class PooledChannel : IPooledWapper
     {
-        private bool _disposed;
         private IModel _innerChannel;
         private IConnection _connection;
         private IMessageRepository _repository;
@@ -21,16 +20,7 @@ namespace LightMessager.Pool
         private object _lockobj;
         private static Logger _logger = LogManager.GetLogger("PooledChannel");
 
-        public IModel Channel
-        {
-            get
-            {
-                if (_disposed)
-                    throw new ObjectDisposedException(nameof(PooledChannel));
-
-                return this._innerChannel;
-            }
-        }
+        public IModel Channel { get { return this._innerChannel; } }
 
         public PooledChannel(IModel channel, ObjectPool<IPooledWapper> pool,
             IMessageRepository repository, IConnection connection)
